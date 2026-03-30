@@ -55,8 +55,6 @@ class Product(models.Model):
 
     @property
     def current_stock(self):
-        """
-        Calcula el stock actual sumando todos los movimientos.
-        Se implementará cuando exista el modelo Movement.
-        """
-        return 0
+        from inventory.models import Movement
+
+        return Movement.get_stock_for_product(self)
