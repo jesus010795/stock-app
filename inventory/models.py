@@ -49,6 +49,18 @@ class Movement(models.Model):
         if not self.quantity or self.quantity <= 0:
             raise ValidationError({"quantity": "La cantidad debe ser mayor a 0"})
 
+        if self.movement_type == MovementType.EXIT:
+            if not self.project and not self.reason:
+                raise ValidationError(
+                    {"reason": "Debe indicar proyecto o motivo de la salida"}
+                )
+
+        if self.movement_type == MovementType.ENTRY:
+            if not self.project and not self.reason:
+                raise ValidationError(
+                    {"reason": "Debe indicar proyecto o motivo de la entrada"}
+                )
+
         if self.movement_type == MovementType.ADJUSTMENT:
             if not self.adjustment_type:
                 raise ValidationError(
@@ -58,13 +70,8 @@ class Movement(models.Model):
                 raise ValidationError({"reason": "Debe ingresar el motivo del ajuste"})
         else:
             if self.adjustment_type:
-                raise ValidationError({"adjustment_type": "Solo aplica para ajustes"})
-
-        if self.movement_type == MovementType.EXIT:
-            if not self.project and not self.reason:
-                raise ValidationError(
-                    {"reason": "Debe indicar proyecto o motivo de la salida"}
-                )
+                self.adjustment_type = None
+                # raise ValidationError({"adjustment_type": "Solo aplica para ajustes"})
 
     def save(self, *args, **kwargs):
         self.full_clean()
