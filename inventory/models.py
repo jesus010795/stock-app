@@ -2,7 +2,7 @@ from django.db import models
 from django.db.models import Sum, Q
 from django.core.exceptions import ValidationError
 from products.models import Product
-from projects.models import Project
+from projects.models import Project, ProjectStatus
 
 
 class MovementType(models.TextChoices):
@@ -53,6 +53,10 @@ class Movement(models.Model):
             if not self.project and not self.reason:
                 raise ValidationError(
                     {"reason": "Debe indicar proyecto o motivo de la salida"}
+                )
+            if self.project and self.project.status != ProjectStatus.APPROVED:
+                raise ValidationError(
+                    {"project": "Solo se puede sacar material para proyectos en curso (Aprobados)"}
                 )
 
         if self.movement_type == MovementType.ENTRY:

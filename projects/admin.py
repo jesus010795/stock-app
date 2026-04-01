@@ -8,20 +8,21 @@ class ProjectAdmin(admin.ModelAdmin):
     list_display = [
         "code",
         "name",
-        "is_active",
+        "status",
         "product_count",
         "total_consumption",
-        "created_at",
+        "start_date",
     ]
-    list_filter = ["is_active"]
+    list_filter = ["status"]
     search_fields = ["code", "name", "description"]
     ordering = ["code"]
-    list_editable = ["is_active"]
+    list_editable = ["status"]
     readonly_fields = ["product_count", "total_consumption", "created_at"]
 
     fieldsets = (
         ("Información Principal", {"fields": ("code", "name", "description")}),
-        ("Estado", {"fields": ("is_active",)}),
+        ("Cronología", {"fields": ("start_date", "end_date")}),
+        ("Estado", {"fields": ("status",)}),
         (
             "Estadísticas",
             {
@@ -31,24 +32,10 @@ class ProjectAdmin(admin.ModelAdmin):
         ),
     )
 
-    # def product_count(self, obj):
-    #     return obj.product_count
-    # product_count.short_description = 'Productos Consumidos'
-
-    # def total_consumption(self, obj):
-    #     return obj.total_consumption
-    # total_consumption.short_description = 'Consumo Total'
-
     def get_queryset(self, request):
-        """
-        Calculamos las estadísticas en UNA SOLA consulta SQL
-        usando JOINs optimizados.
-        """
         queryset = super().get_queryset(request)
         queryset = queryset.annotate(
-            # Contamos productos distintos
             _product_count=Count("movements__product", distinct=True),
-            # Sumamos solo movimientos de tipo EXIT (Salida)
             _total_qty=Sum(
                 "movements__quantity", filter=Q(movements__movement_type="EXIT")
             ),
@@ -56,13 +43,10 @@ class ProjectAdmin(admin.ModelAdmin):
         return queryset
 
     def product_count(self, obj):
-        # Usamos el valor anotado (o el de la property si falla)
         return getattr(obj, "_product_count", 0)
 
     product_count.short_description = "Productos Distintos"
-    product_count.admin_order_field = (
-        "_product_count"  # ¡Ahora puedes ordenar por esta columna!
-    )
+    product_count.admin_order_field = "_product_count"
 
     def total_consumption(self, obj):
         return getattr(obj, "_total_qty", 0) or 0
