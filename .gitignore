@@ -1,6 +1,8 @@
 # Created by https://www.toptal.com/developers/gitignore/api/django
 # Edit at https://www.toptal.com/developers/gitignore?templates=django
 commits.txt
+prompt.txt
+resumen_06-04-2026.txt
 ### Django ###
 *.log
 *.pot
