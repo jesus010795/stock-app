@@ -3,6 +3,7 @@
 commits.txt
 prompt.txt
 resumen_06-04-2026.txt
+docs/analisis_modelos.txt
 ### Django ###
 *.log
 *.pot

@@ -1,6 +1,25 @@
 from django.contrib import admin
 from .models import Project
-from django.db.models import Sum, Count, Q
+from inventory.models import Movement, MovementType
+
+
+class ConsumedProductsInline(admin.TabularInline):
+    model = Movement
+    extra = 0
+    readonly_fields = ['product', 'quantity', 'created_at']
+    verbose_name = "Producto Consumido"
+    verbose_name_plural = "Productos Consumidos"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.filter(movement_type=MovementType.EXIT).select_related('product', 'product__unit')
+        return qs
 
 
 @admin.register(Project)
@@ -12,12 +31,14 @@ class ProjectAdmin(admin.ModelAdmin):
         "product_count",
         "total_consumption",
         "start_date",
+        "created_at",
     ]
     list_filter = ["status"]
     search_fields = ["code", "name", "description"]
     ordering = ["code"]
     list_editable = ["status"]
     readonly_fields = ["product_count", "total_consumption", "created_at"]
+    inlines = [ConsumedProductsInline]
 
     fieldsets = (
         ("Información Principal", {"fields": ("code", "name", "description")}),
@@ -33,14 +54,7 @@ class ProjectAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        queryset = super().get_queryset(request)
-        queryset = queryset.annotate(
-            _product_count=Count("movements__product", distinct=True),
-            _total_qty=Sum(
-                "movements__quantity", filter=Q(movements__movement_type="EXIT")
-            ),
-        )
-        return queryset
+        return super().get_queryset(request).with_consumption()
 
     def product_count(self, obj):
         return getattr(obj, "_product_count", 0)

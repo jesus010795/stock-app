@@ -1,6 +1,7 @@
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.core.exceptions import ValidationError
+from django.db.models import ProtectedError
 
 
 class ProjectStatus(models.TextChoices):
@@ -8,6 +9,32 @@ class ProjectStatus(models.TextChoices):
     APPROVED = "APPROVED", "En Curso"
     FINISHED = "FINISHED", "Finalizado"
     CANCELLED = "CANCELLED", "Cancelado"
+
+
+class ProjectQuerySet(models.QuerySet):
+    def with_consumption(self):
+        from inventory.models import MovementType
+        return self.annotate(
+            _product_count=Count("movements__product", distinct=True),
+            _total_qty=Sum(
+                "movements__quantity",
+                filter=models.Q(movements__movement_type=MovementType.EXIT)
+            )
+        )
+
+    def active(self):
+        return self.filter(status__in=[ProjectStatus.CREATED, ProjectStatus.APPROVED])
+
+
+class ProjectManager(models.Manager):
+    def get_queryset(self):
+        return ProjectQuerySet(self.model, using=self._db)
+
+    def with_consumption(self):
+        return self.get_queryset().with_consumption()
+
+    def active(self):
+        return self.get_queryset().active()
 
 
 class Project(models.Model):
@@ -23,8 +50,14 @@ class Project(models.Model):
     end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = ProjectManager()
+
     class Meta:
         ordering = ['code']
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["code"]),
+        ]
 
     def __str__(self):
         return f"{self.code} - {self.name}"
@@ -36,25 +69,28 @@ class Project(models.Model):
                 raise ValidationError({
                     'end_date': 'La fecha de cierre no puede ser anterior a la fecha de inicio'
                 })
+        if self.code and not self.code.strip():
+            raise ValidationError({'code': 'El código no puede estar vacío'})
 
-    @property
-    def total_consumption(self):
-        from inventory.models import Movement, MovementType
-        result = Movement.objects.filter(
-            project=self,
-            movement_type=MovementType.EXIT
-        ).aggregate(total=Sum('quantity'))
-        return result['total'] or 0
-
-    @property
-    def product_count(self):
-        return self.movements.values('product').distinct().count()
+    def delete(self, *args, **kwargs):
+        if self.movements.exists():
+            raise ProtectedError(
+                "No se puede eliminar el proyecto porque tiene movimientos asociados",
+                [self],
+            )
+        super().delete(*args, **kwargs)
 
     def get_consumed_products(self):
         from inventory.models import Movement, MovementType
-        return Movement.objects.filter(
-            project=self,
-            movement_type=MovementType.EXIT
-        ).values('product__sku', 'product__name', 'product__unit__abbreviation').annotate(
-            total_consumed=Sum('quantity')
-        ).order_by('product__name')
+        return list(
+            Movement.objects.filter(
+                project=self,
+                movement_type=MovementType.EXIT
+            ).values(
+                'product__sku',
+                'product__name',
+                'product__unit__abbreviation'
+            ).annotate(
+                total_consumed=Sum('quantity')
+            ).order_by('product__name')
+        )

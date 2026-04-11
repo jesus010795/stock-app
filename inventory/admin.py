@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Movement, MovementType, AdjustmentType
+from .models import Movement
 
 
 @admin.register(Movement)
@@ -17,6 +17,7 @@ class MovementAdmin(admin.ModelAdmin):
         "adjustment_type",
         ("created_at", admin.DateFieldListFilter),
         "product__category",
+        "project",
     ]
     search_fields = [
         "product__sku",
@@ -52,14 +53,10 @@ class MovementAdmin(admin.ModelAdmin):
     )
 
     def signed_quantity(self, obj):
-        if obj.movement_type == MovementType.ENTRY:
-            return f"+{obj.quantity}"
-        elif obj.movement_type == MovementType.EXIT:
-            return f"-{obj.quantity}"
-        elif obj.movement_type == MovementType.ADJUSTMENT:
-            sign = "+" if obj.adjustment_type == AdjustmentType.IN else "-"
-            return f"{sign}{obj.quantity}"
-        return obj.quantity
+        signed = obj.signed_quantity
+        if signed >= 0:
+            return f"+{signed}"
+        return f"{signed}"
 
     signed_quantity.short_description = "Cantidad"
 

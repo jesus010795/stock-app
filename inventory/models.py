@@ -16,6 +16,73 @@ class AdjustmentType(models.TextChoices):
     OUT = "OUT", "Disminución"
 
 
+class MovementQuerySet(models.QuerySet):
+    def for_product(self, product):
+        return self.filter(product=product)
+
+    def for_project(self, project):
+        return self.filter(project=project)
+
+    def entries(self):
+        return self.filter(movement_type=MovementType.ENTRY)
+
+    def exits(self):
+        return self.filter(movement_type=MovementType.EXIT)
+
+    def adjustments(self):
+        return self.filter(movement_type=MovementType.ADJUSTMENT)
+
+    def with_product_stock(self):
+        from django.db.models import Case, When, Value, F, DecimalField
+        from django.db.models.functions import Coalesce
+
+        return self.annotate(
+            _stock=Coalesce(
+                Sum(
+                    Case(
+                        When(movement_type=MovementType.ENTRY, then=F('quantity')),
+                        When(movement_type=MovementType.EXIT, then=F('quantity') * -1),
+                        When(movement_type=MovementType.ADJUSTMENT, adjustment_type=AdjustmentType.IN, then=F('quantity')),
+                        When(movement_type=MovementType.ADJUSTMENT, adjustment_type=AdjustmentType.OUT, then=F('quantity') * -1),
+                        default=Value(0),
+                        output_field=DecimalField()
+                    )
+                ),
+                Value(0),
+                output_field=DecimalField()
+            )
+        )
+
+    def by_product(self, product):
+        return self.filter(product=product)
+
+    def by_project(self, project):
+        return self.filter(project=project)
+
+
+class MovementManager(models.Manager):
+    def get_queryset(self):
+        return MovementQuerySet(self.model, using=self._db)
+
+    def for_product(self, product):
+        return self.get_queryset().for_product(product)
+
+    def for_project(self, project):
+        return self.get_queryset().for_project(project)
+
+    def entries(self):
+        return self.get_queryset().entries()
+
+    def exits(self):
+        return self.get_queryset().exits()
+
+    def adjustments(self):
+        return self.get_queryset().adjustments()
+
+    def with_product_stock(self):
+        return self.get_queryset().with_product_stock()
+
+
 class Movement(models.Model):
     product = models.ForeignKey(
         Product, on_delete=models.PROTECT, related_name="movements"
@@ -42,6 +109,15 @@ class Movement(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["product"]),
+            models.Index(fields=["project"]),
+            models.Index(fields=["movement_type"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["product", "movement_type"]),
+        ]
+
+    objects = MovementManager()
 
     def clean(self):
         super().clean()
@@ -147,4 +223,16 @@ class Movement(models.Model):
         return result["total"] or 0
 
     def __str__(self):
-        return f"{self.product.sku} - {self.movement_type} - {self.quantity}"
+        return f"{self.product.sku} - {self.movement_type} - {self.signed_quantity}"
+
+    @property
+    def signed_quantity(self):
+        if self.movement_type == MovementType.ENTRY:
+            return self.quantity
+        elif self.movement_type == MovementType.EXIT:
+            return -self.quantity
+        elif self.movement_type == MovementType.ADJUSTMENT:
+            if self.adjustment_type == AdjustmentType.IN:
+                return self.quantity
+            return -self.quantity
+        return self.quantity
