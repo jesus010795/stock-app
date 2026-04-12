@@ -82,6 +82,27 @@ class MovementManager(models.Manager):
     def with_product_stock(self):
         return self.get_queryset().with_product_stock()
 
+    def get_products_with_stock(self):
+        from django.db.models import Case, When, Value, F, DecimalField
+        from django.db.models.functions import Coalesce
+
+        return self.values('product').annotate(
+            _stock=Coalesce(
+                Sum(
+                    Case(
+                        When(movement_type=MovementType.ENTRY, then=F('quantity')),
+                        When(movement_type=MovementType.EXIT, then=F('quantity') * -1),
+                        When(movement_type=MovementType.ADJUSTMENT, adjustment_type=AdjustmentType.IN, then=F('quantity')),
+                        When(movement_type=MovementType.ADJUSTMENT, adjustment_type=AdjustmentType.OUT, then=F('quantity') * -1),
+                        default=Value(0),
+                        output_field=DecimalField()
+                    )
+                ),
+                Value(0),
+                output_field=DecimalField()
+            )
+        ).values('product__id', 'product__sku', 'product__name', '_stock')
+
 
 class Movement(models.Model):
     product = models.ForeignKey(

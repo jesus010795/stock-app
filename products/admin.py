@@ -64,10 +64,17 @@ class ProductAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).with_stock().with_category()
+        from inventory.models import Movement
+        qs = super().get_queryset(request).with_category()
+        # Obtener stocks desde Movement (única fuente de verdad)
+        stock_map = {
+            r['product__id']: r['_stock'] 
+            for r in Movement.objects.get_products_with_stock()
+        }
+        self._stock_map = stock_map
+        return qs
 
     def current_stock(self, obj):
-        return getattr(obj, "_stock", 0)
+        return self._stock_map.get(obj.id, 0)
 
     current_stock.short_description = "Stock Actual"
-    current_stock.admin_order_field = "_stock"

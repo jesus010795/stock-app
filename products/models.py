@@ -62,42 +62,6 @@ class ProductQuerySet(models.QuerySet):
     def active(self):
         return self.filter(is_active=True)
 
-    def with_stock(self):
-        from inventory.models import MovementType, AdjustmentType
-        from django.db.models import Case, When, Value, F, DecimalField, Sum
-        from django.db.models.functions import Coalesce
-
-        return self.annotate(
-            _stock=Coalesce(
-                Sum(
-                    Case(
-                        When(
-                            movements__movement_type=MovementType.ENTRY,
-                            then=F("movements__quantity"),
-                        ),
-                        When(
-                            movements__movement_type=MovementType.EXIT,
-                            then=F("movements__quantity") * -1,
-                        ),
-                        When(
-                            movements__movement_type=MovementType.ADJUSTMENT,
-                            movements__adjustment_type=AdjustmentType.IN,
-                            then=F("movements__quantity"),
-                        ),
-                        When(
-                            movements__movement_type=MovementType.ADJUSTMENT,
-                            movements__adjustment_type=AdjustmentType.OUT,
-                            then=F("movements__quantity") * -1,
-                        ),
-                        default=Value(0),
-                        output_field=DecimalField(),
-                    )
-                ),
-                Value(0),
-                output_field=DecimalField(),
-            )
-        )
-
     def with_category(self):
         return self.select_related("category", "unit")
 
@@ -108,9 +72,6 @@ class ProductManager(models.Manager):
 
     def active(self):
         return self.get_queryset().active()
-
-    def with_stock(self):
-        return self.get_queryset().with_stock()
 
     def with_category(self):
         return self.get_queryset().with_category()
