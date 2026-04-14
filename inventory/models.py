@@ -3,6 +3,7 @@ from django.db.models import Sum, Q
 from django.core.exceptions import ValidationError
 from products.models import Product
 from projects.models import Project, ProjectStatus
+from warehouses.models import Warehouse
 
 
 class MovementType(models.TextChoices):
@@ -115,6 +116,13 @@ class Movement(models.Model):
         blank=True,
         related_name="movements",
     )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="movements",
+    )
     movement_type = models.CharField(max_length=10, choices=MovementType.choices)
     adjustment_type = models.CharField(
         max_length=3, choices=AdjustmentType.choices, blank=True, null=True
@@ -145,6 +153,9 @@ class Movement(models.Model):
 
         if not self.quantity or self.quantity <= 0:
             raise ValidationError({"quantity": "La cantidad debe ser mayor a 0"})
+
+        if not self.warehouse and self.product:
+            self.warehouse = self.product.warehouse
 
         if self.movement_type == MovementType.EXIT:
             if not self.project and not self.reason:

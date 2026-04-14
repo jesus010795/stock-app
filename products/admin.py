@@ -49,8 +49,8 @@ class UnitAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ["sku", "name", "category", "unit", "current_stock", "minimum_stock", "is_active"]
-    list_filter = ["category", "unit", "is_active"]
+    list_display = ["sku", "name", "category", "unit", "warehouse", "current_stock", "minimum_stock", "is_active"]
+    list_filter = ["category", "unit", "warehouse", "is_active"]
     search_fields = ["sku", "name"]
     ordering = ["sku", "name"]
     list_editable = ["is_active"]
@@ -59,6 +59,7 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Información Principal", {"fields": ("sku", "name", "description")}),
         ("Clasificación", {"fields": ("category", "unit")}),
+        ("Ubicación", {"fields": ("warehouse",)}),
         ("Stock", {"fields": ("minimum_stock",)}),
         ("Estado", {"fields": ("is_active",)}),
     )

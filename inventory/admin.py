@@ -9,12 +9,14 @@ class MovementAdmin(admin.ModelAdmin):
         "product",
         "movement_type",
         "signed_quantity",
+        "warehouse",
         "project",
         "reason",
     ]
     list_filter = [
         "movement_type",
         "adjustment_type",
+        "warehouse",
         ("created_at", admin.DateFieldListFilter),
         "product__category",
         "project",
@@ -36,6 +38,12 @@ class MovementAdmin(admin.ModelAdmin):
         ("Producto", {"fields": ("product",)}),
         ("Tipo de Movimiento", {"fields": ("movement_type", "adjustment_type")}),
         ("Cantidad", {"fields": ("quantity",)}),
+        (
+            "Ubicación",
+            {
+                "fields": ("warehouse",),
+            },
+        ),
         (
             "Justificación",
             {

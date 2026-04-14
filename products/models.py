@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
+from warehouses.models import Warehouse
 
 
 class CategoryQuerySet(models.QuerySet):
@@ -127,6 +128,14 @@ class Product(models.Model):
     unit = models.ForeignKey(
         Unit, on_delete=models.PROTECT, related_name="products", verbose_name="Unidad"
     )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="products",
+        verbose_name="Almacén",
+        null=True,
+        blank=True,
+    )
     description = models.TextField(blank=True, verbose_name="Descripción")
     minimum_stock = models.DecimalField(
         max_digits=12,
@@ -164,6 +173,8 @@ class Product(models.Model):
             raise ValidationError(
                 {"minimum_stock": "El stock mínimo no puede ser negativo"}
             )
+        if not self.warehouse:
+            raise ValidationError({"warehouse": "El almacén es obligatorio"})
 
     def delete(self, *args, **kwargs):
         if self.movements.exists():
