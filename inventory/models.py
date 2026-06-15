@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from products.models import Product
 from projects.models import Project, ProjectStatus
 from warehouses.models import Warehouse
+from employees.models import Employee
 
 
 class MovementType(models.TextChoices):
@@ -123,6 +124,12 @@ class Movement(models.Model):
         blank=True,
         related_name="movements",
     )
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.PROTECT,
+        related_name="movements",
+        verbose_name="Empleado",
+    )
     movement_type = models.CharField(max_length=10, choices=MovementType.choices)
     adjustment_type = models.CharField(
         max_length=3, choices=AdjustmentType.choices, blank=True, null=True
@@ -156,6 +163,11 @@ class Movement(models.Model):
 
         if not self.warehouse and self.product:
             self.warehouse = self.product.warehouse
+
+        if not self.employee:
+            raise ValidationError(
+                {"employee": "Debe seleccionar un empleado"}
+            )
 
         if self.movement_type == MovementType.EXIT:
             if not self.project and not self.reason:

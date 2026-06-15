@@ -7,6 +7,7 @@ class MovementAdmin(admin.ModelAdmin):
     list_display = [
         "created_at",
         "product",
+        "employee",
         "movement_type",
         "signed_quantity",
         "warehouse",
@@ -14,6 +15,7 @@ class MovementAdmin(admin.ModelAdmin):
         "reason",
     ]
     list_filter = [
+        "employee",
         "movement_type",
         "adjustment_type",
         "warehouse",
@@ -22,6 +24,7 @@ class MovementAdmin(admin.ModelAdmin):
         "project",
     ]
     search_fields = [
+        "employee__first_name",
         "product__sku",
         "product__name",
         "project__code",
@@ -36,6 +39,7 @@ class MovementAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Producto", {"fields": ("product",)}),
+        ("Solicitante", {"fields": ("employee",)}),
         ("Tipo de Movimiento", {"fields": ("movement_type", "adjustment_type")}),
         ("Cantidad", {"fields": ("quantity",)}),
         (
@@ -71,6 +75,7 @@ class MovementAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return self.readonly_fields + [
+                "employee",
                 "product",
                 "movement_type",
                 "quantity",
