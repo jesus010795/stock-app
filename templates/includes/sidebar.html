@@ -1,0 +1,61 @@
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <h1><i class="fas fa-warehouse"></i> AlmacenSys</h1>
+        <p>Sistema de Gesti&oacute;n</p>
+    </div>
+
+    <div class="nav-section">
+        <div class="nav-section-title">Principal</div>
+        {% comment %} <a href="{% url 'home' %}" class="nav-item {% if section == 'dashboard' %}active{% endif %}"> {% endcomment %}
+        <a href="#">
+            <i class="fas fa-chart-line"></i>
+            <span>Dashboard</span>
+        </a>
+        {% comment %} <a href="{% url 'movimiento_create' %}" class="nav-item {% if section == 'movimiento_create' %}active{% endif %}"> {% endcomment %}
+        <a href="#" class="nav-item {% if section == 'movimiento_create' %}active{% endif %}">
+            <i class="fas fa-exchange-alt"></i>
+            <span>Nuevo Movimiento</span>
+        </a>
+    </div>
+
+    <div class="nav-section">
+        <div class="nav-section-title">Gesti&oacute;n</div>
+        {% comment %} <a href="{% url 'producto_list' %}" class="nav-item {% if section == 'producto_list' %}active{% endif %}"> {% endcomment %}
+        <a href="#" class="nav-item {% if section == 'producto_list' %}active{% endif %}">
+            <i class="fas fa-boxes"></i>
+            <span>Productos</span>
+            {% if product_count %}
+                <span class="badge">{{ product_count }}</span>
+            {% endif %}
+        </a>
+        {% comment %} <a href="{% url 'proyecto_list' %}" class="nav-item {% if section == 'proyecto_list' %}active{% endif %}"> {% endcomment %}
+        <a href="#" class="nav-item {% if section == 'proyecto_list' %}active{% endif %}">
+            <i class="fas fa-project-diagram"></i>
+            <span>Proyectos</span>
+        </a>
+        {% comment %} <a href="{% url 'empleado_list' %}" class="nav-item {% if section == 'empleado_list' %}active{% endif %}"> {% endcomment %}
+        <a href="#" class="nav-item {% if section == 'empleado_list' %}active{% endif %}">
+            <i class="fas fa-users"></i>
+            <span>Empleados</span>
+        </a>
+        {% comment %} <a href="{% url 'movimiento_list' %}" class="nav-item {% if section == 'movimiento_list' %}active{% endif %}"> {% endcomment %}
+        <a href="#" class="nav-item {% if section == 'movimiento_list' %}active{% endif %}">
+            <i class="fas fa-history"></i>
+            <span>Historial</span>
+        </a>
+    </div>
+
+    <div class="nav-section">
+        <div class="nav-section-title">Reportes</div>
+        {% comment %} <a href="{% url 'reporte_inventario' %}" class="nav-item {% if section == 'reporte_inventario' %}active{% endif %}"> {% endcomment %}
+        <a href="#" class="nav-item {% if section == 'reporte_inventario' %}active{% endif %}">
+            <i class="fas fa-file-alt"></i>
+            <span>Inventario</span>
+        </a>
+        {% comment %} <a href="{% url 'reporte_movimientos' %}" class="nav-item {% if section == 'reporte_movimientos' %}active{% endif %}"> {% endcomment %}
+        <a href="#" class="nav-item {% if section == 'reporte_movimientos' %}active{% endif %}">
+            <i class="fas fa-file-invoice"></i>
+            <span>Movimientos</span>
+        </a>
+    </div>
+</aside>

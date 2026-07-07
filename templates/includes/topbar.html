@@ -1,0 +1,27 @@
+<header class="topbar">
+    <div class="topbar-left">
+        <button class="menu-toggle" id="menuToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        <nav class="breadcrumb">
+            {% block breadcrumb %}
+                <strong>Dashboard</strong> / Resumen General
+            {% endblock %}
+        </nav>
+    </div>
+    <div class="topbar-right">
+        <button class="notification-btn">
+            <i class="fas fa-bell"></i>
+            {% if unread_notifications %}
+                <span class="dot"></span>
+            {% endif %}
+        </button>
+        <div class="user-profile">
+            <div class="user-avatar">{{ user_initials|default:"AD" }}</div>
+            <div class="user-info">
+                <div class="user-name">{{ user_full_name|default:"Admin User" }}</div>
+                <div class="user-role">{{ user_role|default:"Administrador" }}</div>
+            </div>
+        </div>
+    </div>
+</header>
