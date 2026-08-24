@@ -1,61 +1,80 @@
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-        <h1><i class="fas fa-warehouse"></i> AlmacenSys</h1>
-        <p>Sistema de Gesti&oacute;n</p>
-    </div>
-
-    <div class="nav-section">
-        <div class="nav-section-title">Principal</div>
-        {% comment %} <a href="{% url 'home' %}" class="nav-item {% if section == 'dashboard' %}active{% endif %}"> {% endcomment %}
-        <a href="#">
-            <i class="fas fa-chart-line"></i>
-            <span>Dashboard</span>
-        </a>
-        {% comment %} <a href="{% url 'movimiento_create' %}" class="nav-item {% if section == 'movimiento_create' %}active{% endif %}"> {% endcomment %}
-        <a href="#" class="nav-item {% if section == 'movimiento_create' %}active{% endif %}">
-            <i class="fas fa-exchange-alt"></i>
-            <span>Nuevo Movimiento</span>
+        {% comment %} <a href="{% url 'dashboard:index' %}" class="sidebar-brand"> {% endcomment %}
+        <a href="" class="sidebar-brand">    
+            <i class="fas fa-warehouse"></i>
+            <div>
+                <h1>AlmacenSys</h1>
+                <p>Sistema de Gestión</p>
+            </div>
         </a>
     </div>
 
-    <div class="nav-section">
-        <div class="nav-section-title">Gesti&oacute;n</div>
-        {% comment %} <a href="{% url 'producto_list' %}" class="nav-item {% if section == 'producto_list' %}active{% endif %}"> {% endcomment %}
-        <a href="#" class="nav-item {% if section == 'producto_list' %}active{% endif %}">
-            <i class="fas fa-boxes"></i>
-            <span>Productos</span>
-            {% if product_count %}
-                <span class="badge">{{ product_count }}</span>
-            {% endif %}
-        </a>
-        {% comment %} <a href="{% url 'proyecto_list' %}" class="nav-item {% if section == 'proyecto_list' %}active{% endif %}"> {% endcomment %}
-        <a href="#" class="nav-item {% if section == 'proyecto_list' %}active{% endif %}">
-            <i class="fas fa-project-diagram"></i>
-            <span>Proyectos</span>
-        </a>
-        {% comment %} <a href="{% url 'empleado_list' %}" class="nav-item {% if section == 'empleado_list' %}active{% endif %}"> {% endcomment %}
-        <a href="#" class="nav-item {% if section == 'empleado_list' %}active{% endif %}">
-            <i class="fas fa-users"></i>
-            <span>Empleados</span>
-        </a>
-        {% comment %} <a href="{% url 'movimiento_list' %}" class="nav-item {% if section == 'movimiento_list' %}active{% endif %}"> {% endcomment %}
-        <a href="#" class="nav-item {% if section == 'movimiento_list' %}active{% endif %}">
-            <i class="fas fa-history"></i>
-            <span>Historial</span>
-        </a>
-    </div>
 
-    <div class="nav-section">
-        <div class="nav-section-title">Reportes</div>
-        {% comment %} <a href="{% url 'reporte_inventario' %}" class="nav-item {% if section == 'reporte_inventario' %}active{% endif %}"> {% endcomment %}
-        <a href="#" class="nav-item {% if section == 'reporte_inventario' %}active{% endif %}">
-            <i class="fas fa-file-alt"></i>
-            <span>Inventario</span>
-        </a>
-        {% comment %} <a href="{% url 'reporte_movimientos' %}" class="nav-item {% if section == 'reporte_movimientos' %}active{% endif %}"> {% endcomment %}
-        <a href="#" class="nav-item {% if section == 'reporte_movimientos' %}active{% endif %}">
-            <i class="fas fa-file-invoice"></i>
-            <span>Movimientos</span>
-        </a>
+    <nav class="sidebar-nav">
+        <div class="nav-section">
+            <span class="nav-section-title">Principal</span>
+            {% comment %} {% url 'dashboard:index' %} {% endcomment %}
+            <a href="" 
+               class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard</span>
+            </a>
+            {% comment %} {% url 'movimientos:nuevo' %} {% endcomment %}
+            <a href="" 
+               class="nav-item {% if request.resolver_match.url_name == 'nuevo' %}active{% endif %}">
+                <i class="fas fa-exchange-alt"></i>
+                <span>Nuevo Movimiento</span>
+            </a>
+        </div>
+
+        <div class="nav-section">
+            <span class="nav-section-title">Gestión</span>
+            {% comment %} {% url 'productos:lista' %} {% endcomment %}
+            <a href="" 
+               class="nav-item {% if request.resolver_match.namespace == 'productos' %}active{% endif %}">
+                <i class="fas fa-boxes"></i>
+                <span>Productos</span>
+                {% if alertas_count > 0 %}
+                <span class="badge">{{ alertas_count }}</span>
+                {% endif %}
+            </a>
+            {% comment %} {% url 'proyectos:lista' %} {% endcomment %}
+            <a href="" 
+               class="nav-item {% if request.resolver_match.namespace == 'proyectos' %}active{% endif %}">
+                <i class="fas fa-project-diagram"></i>
+                <span>Proyectos</span>
+            </a>
+            {% comment %} {% url 'empleados:lista' %} {% endcomment %}
+            <a href="" 
+               class="nav-item {% if request.resolver_match.namespace == 'empleados' %}active{% endif %}">
+                <i class="fas fa-users"></i>
+                <span>Empleados</span>
+            </a>
+            {% comment %} {% url 'movimientos:historial' %} {% endcomment %}
+            <a href="" 
+               class="nav-item {% if request.resolver_match.url_name == 'historial' %}active{% endif %}">
+                <i class="fas fa-history"></i>
+                <span>Historial</span>
+            </a>
+        </div>
+
+        <div class="nav-section">
+            <span class="nav-section-title">Reportes</span>
+            {% comment %} {% url 'reportes:inventario' %} {% endcomment %}
+            <a href="" class="nav-item">
+                <i class="fas fa-file-alt"></i>
+                <span>Inventario</span>
+            </a>
+            {% comment %} {% url 'reportes:movimientos' %} {% endcomment %}
+            <a href="" class="nav-item">
+                <i class="fas fa-file-invoice"></i>
+                <span>Movimientos</span>
+            </a>
+        </div>
+    </nav>
+    <div class="sidebar-footer">
+        <span>v1.0.0</span>
+        <a href="#" title="Configuración"><i class="fas fa-cog"></i></a>
     </div>
 </aside>
