@@ -15,13 +15,13 @@
         <div class="nav-section">
             <span class="nav-section-title">Principal</span>
             {% comment %} {% url 'dashboard:index' %} {% endcomment %}
-            <a href="" 
+            <a href="{% url 'home' %}" 
                class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
                 <i class="fas fa-chart-line"></i>
                 <span>Dashboard</span>
             </a>
             {% comment %} {% url 'movimientos:nuevo' %} {% endcomment %}
-            <a href="" 
+            <a href="{% url 'inventory:nuevo' %}" 
                class="nav-item {% if request.resolver_match.url_name == 'nuevo' %}active{% endif %}">
                 <i class="fas fa-exchange-alt"></i>
                 <span>Nuevo Movimiento</span>
@@ -31,7 +31,7 @@
         <div class="nav-section">
             <span class="nav-section-title">Gestión</span>
             {% comment %} {% url 'productos:lista' %} {% endcomment %}
-            <a href="" 
+            <a href="{% url 'products:products_list' %}" 
                class="nav-item {% if request.resolver_match.namespace == 'productos' %}active{% endif %}">
                 <i class="fas fa-boxes"></i>
                 <span>Productos</span>
@@ -40,7 +40,7 @@
                 {% endif %}
             </a>
             {% comment %} {% url 'proyectos:lista' %} {% endcomment %}
-            <a href="" 
+            <a href="{% url 'projects:projects_list' %}" 
                class="nav-item {% if request.resolver_match.namespace == 'proyectos' %}active{% endif %}">
                 <i class="fas fa-project-diagram"></i>
                 <span>Proyectos</span>

@@ -64,7 +64,29 @@ class ProductQuerySet(models.QuerySet):
         return self.filter(is_active=True)
 
     def with_category(self):
-        return self.select_related("category", "unit")
+        return self.select_related("category", "unit", "warehouse")
+
+    def with_stock(self):
+        """Anexa el stock calculado a cada producto.
+
+        Retorna una lista (no un queryset) porque anexar un atributo
+        calculado requiere materializar los objetos.
+        """
+        from inventory.models import Movement
+
+        products = list(self)
+        if not products:
+            return products
+
+        stock_map = {
+            r["product__id"]: r["_stock"]
+            for r in Movement.objects.get_products_with_stock()
+        }
+
+        for product in products:
+            product.stock = stock_map.get(product.id, 0)
+
+        return products
 
 
 class ProductManager(models.Manager):
@@ -76,6 +98,9 @@ class ProductManager(models.Manager):
 
     def with_category(self):
         return self.get_queryset().with_category()
+
+    def with_stock(self):
+        return self.get_queryset().with_stock()
 
 
 class Unit(models.Model):
@@ -147,6 +172,21 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True, verbose_name="Activo")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_low_stock(self):
+        """Indica si el stock está en o por debajo del mínimo.
+
+        Requiere que el atributo `.stock` haya sido anexado previamente
+        mediante Product.objects.with_stock(). Si no fue anexado,
+        retorna False.
+        """
+        stock = getattr(self, "stock", None)
+        if stock is None:
+            return False
+        if self.minimum_stock is None or self.minimum_stock < 0:
+            return False
+        return stock <= self.minimum_stock
 
     objects = ProductManager()
 

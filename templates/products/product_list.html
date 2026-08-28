@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Productos - AlmacenSys{% endblock %}
+
+{% block breadcrumb_items %}
+<strong>Productos</strong> / Listado
+{% endblock %}
+
+{% block page_header %}
+<h1 class="page-title">Productos</h1>
+<p class="page-subtitle">Catálogo de productos y stock actual del almacén.</p>
+{% endblock %}
+
+{% block content %}
+<div class="table-toolbar">
+    <span class="card-badge info">{{ products|length }} productos</span>
+    <a href="#" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> Nuevo Producto
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i class="fas fa-boxes"></i> Inventario
+        </h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if products %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Unidad</th>
+                    <th>Almacén</th>
+                    <th class="text-right">Stock Actual</th>
+                    <th class="text-center">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td><span class="badge-sku">{{ product.sku }}</span></td>
+                    <td class="product-name">{{ product.name }}</td>
+                    <td>
+                        {% if product.category %}
+                        <span class="badge badge-info">{{ product.category.name }}</span>
+                        {% else %}
+                        <span class="badge badge-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ product.unit.abbreviation }}</td>
+                    <td>
+                        {% if product.warehouse %}
+                        <span class="table-cell-icon">
+                            <i class="fas fa-warehouse"></i> {{ product.warehouse.name }}
+                        </span>
+                        {% else %}
+                        <span class="badge badge-muted">Sin almacén</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if product.is_low_stock %}
+                        <span class="badge badge-warning">{{ product.stock }}</span>
+                        {% else %}
+                        <span class="badge badge-success">{{ product.stock }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if product.is_active %}
+                        <span class="badge badge-success">Activo</span>
+                        {% else %}
+                        <span class="badge badge-danger">Inactivo</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-box-open"></i>
+            <h3>No hay productos registrados</h3>
+            <p>Agrega tu primer producto para comenzar a gestionar el inventario.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
