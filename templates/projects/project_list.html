@@ -1,3 +1,90 @@
-proyectos
-<br>
-{{projects}}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Proyectos - AlmacenSys{% endblock %}
+
+{% block breadcrumb_items %}
+<strong>Proyectos</strong> / Listado
+{% endblock %}
+
+{% block page_header %}
+<h1 class="page-title">Proyectos</h1>
+<p class="page-subtitle">Gestión de proyectos y consumo de materiales.</p>
+{% endblock %}
+
+{% block content %}
+<div class="table-toolbar">
+    <span class="card-badge info">{{ projects|length }} proyectos</span>
+    <a href="#" class="btn btn-primary btn-sm">
+        <i class="fas fa-folder-plus"></i> Nuevo Proyecto
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i class="fas fa-project-diagram"></i> Proyectos Activos
+        </h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if projects %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Estado</th>
+                    <th>Inicio</th>
+                    <th>Fin</th>
+                    <th class="text-center">Productos</th>
+                    <th class="text-right">Total Consumido</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in projects %}
+                <tr>
+                    <td><span class="badge-sku">{{ project.code }}</span></td>
+                    <td class="project-name">{{ project.name }}</td>
+                    <td>
+                        {% if project.status == "APPROVED" %}
+                        <span class="badge badge-success">En Curso</span>
+                        {% elif project.status == "CREATED" %}
+                        <span class="badge badge-info">Creado</span>
+                        {% elif project.status == "FINISHED" %}
+                        <span class="badge badge-warning">Finalizado</span>
+                        {% elif project.status == "CANCELLED" %}
+                        <span class="badge badge-danger">Cancelado</span>
+                        {% else %}
+                        <span class="badge badge-muted">{{ project.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ project.start_date|default:"—" }}</td>
+                    <td>{{ project.end_date|default:"—" }}</td>
+                    <td class="text-center">
+                        {% if project.product_count %}
+                        <span class="badge badge-info">{{ project.product_count }}</span>
+                        {% else %}
+                        <span class="badge badge-muted">0</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if project.total_consumed %}
+                        <span class="badge badge-success">{{ project.total_consumed }}</span>
+                        {% else %}
+                        <span class="badge badge-muted">0</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-folder-open"></i>
+            <h3>No hay proyectos registrados</h3>
+            <p>Crea un proyecto para comenzar a asociar movimientos de inventario.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Empleados - AlmacenSys{% endblock %}
+
+{% block breadcrumb_items %}
+<strong>Empleados</strong> / Listado
+{% endblock %}
+
+{% block page_header %}
+<h1 class="page-title">Empleados</h1>
+<p class="page-subtitle">Equipo y consumo de materiales por empleado.</p>
+{% endblock %}
+
+{% block content %}
+<div class="table-toolbar">
+    <span class="card-badge info">{{ employees|length }} empleados</span>
+    <a href="#" class="btn btn-primary btn-sm">
+        <i class="fas fa-user-plus"></i> Nuevo Empleado
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i class="fas fa-users"></i> Personal
+        </h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if employees %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Departamento</th>
+                    <th>Estado</th>
+                    <th class="text-center">Productos Consumidos</th>
+                    <th class="text-right">Total Consumido</th>
+                    <th>Registrado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for employee in employees %}
+                <tr>
+                    <td class="employee-name">
+                        <span class="table-cell-icon">
+                            <i class="fas fa-user"></i> {{ employee.full_name }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-info">{{ employee.department.name }}</span>
+                    </td>
+                    <td>
+                        {% if employee.is_active %}
+                        <span class="badge badge-success">Activo</span>
+                        {% else %}
+                        <span class="badge badge-danger">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if employee.product_count %}
+                        <span class="badge badge-info">{{ employee.product_count }}</span>
+                        {% else %}
+                        <span class="badge badge-muted">0</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if employee.total_consumed %}
+                        <span class="badge badge-success">{{ employee.total_consumed }}</span>
+                        {% else %}
+                        <span class="badge badge-muted">0</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ employee.created_at|date:"d/m/Y" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-user-slash"></i>
+            <h3>No hay empleados registrados</h3>
+            <p>Registra al personal que solicitará o registrará movimientos de inventario.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

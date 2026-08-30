@@ -50,6 +50,24 @@ class Project(models.Model):
     end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def product_count(self):
+        """Cantidad de productos distintos consumidos en el proyecto.
+
+        Requiere que el queryset haya sido anotado mediante
+        Project.objects.with_consumption().
+        """
+        return getattr(self, "_product_count", 0) or 0
+
+    @property
+    def total_consumed(self):
+        """Cantidad total de unidades consumidas (salidas) del proyecto.
+
+        Requiere que el queryset haya sido anotado mediante
+        Project.objects.with_consumption().
+        """
+        return getattr(self, "_total_qty", 0) or 0
+
     objects = ProjectManager()
 
     class Meta:
