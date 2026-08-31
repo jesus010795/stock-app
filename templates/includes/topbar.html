@@ -1,73 +1,31 @@
-{% load static %}
 <header class="topbar">
-    <div class="topbar-left">
-        <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
-            <i class="fas fa-bars"></i>
-        </button>
-        {% block breadcrumb_override %}
-        <nav class="breadcrumb" aria-label="Breadcrumb">
-            {% block breadcrumb_items %}
-            <strong>{{ breadcrumb_title|default:"Dashboard" }}</strong>
-            {% if breadcrumb_subtitle %}
-            <span>/</span> {{ breadcrumb_subtitle }}
-            {% endif %}
-            {% endblock %}
-        </nav>
-        {% endblock %}
-    </div>
+    <div class="topbar-title">{% block topbar_title %}{{ breadcrumb_title|default:"Dashboard" }}{% endblock %}</div>
+
     <div class="topbar-right">
-        <div class="global-search">
+        <div class="topbar-search">
             <i class="fas fa-search"></i>
             <input type="text" placeholder="Buscar productos, proyectos..." id="globalSearch">
         </div>
 
-        <div class="dropdown">
-            <button class="notification-btn" id="notificationBtn" aria-label="Notificaciones">
-                <i class="fas fa-bell"></i>
-                {% if notificaciones_sin_leer > 0 %}
-                <span class="dot">{{ notificaciones_sin_leer }}</span>
-                {% endif %}
-            </button>
-            <div class="dropdown-menu" id="notificationMenu">
-                <div class="dropdown-header">
-                    <span>Notificaciones</span>
-                    <a href="#">Marcar todas leídas</a>
-                </div>
-                <div class="dropdown-body">
-                    {% for notif in notificaciones_recientes %}
-                    <div class="notification-item {% if not notif.leida %}unread{% endif %}">
-                        <i class="fas {{ notif.icono }}"></i>
-                        <div>
-                            <p>{{ notif.mensaje }}</p>
-                            <small>{{ notif.tiempo }}</small>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="empty-state">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>Sin notificaciones</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
+        <button class="icon-btn" aria-label="Notificaciones">
+            <i class="fas fa-bell"></i>
+            <span class="dot"></span>
+        </button>
 
-        <div class="dropdown">
-            <div class="user-profile" id="userProfileBtn">
-                <div class="user-avatar">{{ request.user.first_name|first|default:"U" }}{{ request.user.last_name|first|default:"S" }}</div>
-                <div class="user-info">
+        <div class="user-menu">
+            <div class="user-trigger" data-user-trigger>
+                <div class="avatar">{{ request.user.first_name|first|default:"U" }}{{ request.user.last_name|first|default:"S" }}</div>
+                <div>
                     <div class="user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
                     <div class="user-role">{{ request.user.rol|default:"Usuario" }}</div>
                 </div>
-                <i class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 4px;"></i>
+                <i class="fas fa-chevron-down"></i>
             </div>
-            <div class="dropdown-menu" id="userMenu">
-                {% comment %} {% url 'empleados:perfil' %} {% endcomment %}
+            <div class="user-dropdown" data-user-dropdown>
                 <a href=""><i class="fas fa-user"></i> Mi Perfil</a>
-                <a href="#"><i class="fas fa-cog"></i> Configuración</a>
-                <div class="dropdown-divider"></div>
-                {% comment %} {% url 'logout' %} {% endcomment %}
-                <a href="" class="text-danger"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a>
+                <a href=""><i class="fas fa-cog"></i> Configuración</a>
+                <hr>
+                <a href="" class="danger"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</a>
             </div>
         </div>
     </div>

@@ -1,6 +1,114 @@
-/* Dashboard Grid */
+/* ===========================================================
+   AlmacenSys — dashboard.css
+   Componentes exclusivos del Dashboard (home): acciones
+   rápidas, grid de cards, alertas de stock y actividad.
+   Sección extra de design/css/dashboard.css fusionada — Fase 2.
+   =========================================================== */
+
+/* ===========================================================
+   DASHBOARD — acciones rápidas y grid de cards
+   =========================================================== */
+
+.quick-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
 .dashboard-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: 22px;
 }
+
+/* ===========================================================
+   ALERTAS DE STOCK BAJO
+   =========================================================== */
+
+.alert-list { display: flex; flex-direction: column; }
+
+.alert-item {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 13px 22px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.alert-item:last-child { border-bottom: none; }
+
+.alert-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--warning-bg);
+    color: var(--warning);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.alert-icon.critical { background: var(--danger-bg); color: var(--danger); }
+.alert-icon svg { width: 17px; height: 17px; }
+.alert-icon i { font-size: 15px; }
+
+.alert-info { flex: 1; min-width: 0; }
+.alert-info .name { font-size: 13px; font-weight: 600; color: var(--text); }
+.alert-info .detail { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
+.alert-info .detail strong { color: var(--text-muted); font-weight: 600; }
+
+.alert-action { flex-shrink: 0; }
+
+/* ===========================================================
+   ACTIVIDAD RECIENTE
+   =========================================================== */
+
+.activity-list { display: flex; flex-direction: column; }
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 13px 22px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.activity-item:last-child { border-bottom: none; }
+
+.activity-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.activity-icon svg { width: 16px; height: 16px; }
+.activity-icon i { font-size: 14px; }
+.activity-icon.success { background: var(--success-bg); color: var(--success); }
+.activity-icon.warning { background: var(--warning-bg); color: var(--warning); }
+.activity-icon.info { background: var(--info-bg); color: var(--info); }
+.activity-icon.danger { background: var(--danger-bg); color: var(--danger); }
+.activity-icon.purple { background: var(--purple-light); color: var(--purple-darker); }
+
+.activity-details p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.45;
+}
+.activity-details p strong { font-weight: 600; }
+.activity-details small {
+    display: block;
+    margin-top: 3px;
+    font-size: 11.5px;
+    color: var(--text-faint);
+}
+
+/* ===========================================================
+   LEGACY: grid viejo del dashboard (plantillas anteriores a Fase 5)
+   El grid nuevo (arriba) lo sustituye; estas reglas cubren el
+   gap original de 20px solo si una plantilla aún no migrada
+   conviviera con estilos específicos del dashboard viejo.
+   =========================================================== */

@@ -1,17 +1,20 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}Dashboard - AlmacenSys{% endblock %}
 
 {% block breadcrumb_items %}
-<strong>Dashboard</strong> / Resumen General
+<strong>Dashboard</strong>
+<span>/</span> <span>Resumen General</span>
 {% endblock %}
 
 {% block page_header %}
-<h1 class="page-title">Panel de Control</h1>
-<p class="page-subtitle">Bienvenido de vuelta. Aquí tienes el resumen de tu almacén hoy.</p>
+<div class="page-header">
+    <div>
+        <h1>Panel de Control</h1>
+        <p>Bienvenido de vuelta. Aquí tienes el resumen de tu almacén hoy.</p>
+    </div>
+</div>
 {% endblock %}
-
 
 {% block content %}
 <!-- Acciones Rápidas -->
@@ -19,11 +22,9 @@
     <a href="{% url 'inventory:nuevo' %}" class="btn btn-primary">
         <i class="fas fa-plus"></i> Realizar Movimiento
     </a>
-    {% comment %} <a href="{% url 'productos:nuevo' %}" class="btn btn-secondary"> {% endcomment %}
     <a href="" class="btn btn-secondary">
         <i class="fas fa-box"></i> Agregar Producto
     </a>
-    {% comment %} <a href="{% url 'proyectos:nuevo' %}" class="btn btn-secondary"> {% endcomment %}
     <a href="" class="btn btn-secondary">
         <i class="fas fa-folder-plus"></i> Nuevo Proyecto
     </a>
@@ -31,23 +32,20 @@
 
 <!-- Grid Principal -->
 <div class="dashboard-grid">
+
     <!-- Alertas de Stock -->
     <div class="card">
         <div class="card-header">
-            <h2 class="card-title">
+            <div class="card-header-title">
                 <i class="fas fa-exclamation-triangle"></i> Alertas de Stock Bajo
-            </h2>
-            <span class="card-badge warning">{{ alertas|length }} productos</span>
+            </div>
+            <span class="badge badge-warning">0 productos</span>
         </div>
-        <div class="card-body">
-            <div class="alert-list">
-                {% comment %} {% for alerta in alertas %}
-                    {% include "components/alert_item.html" with item=alerta only %}
-                {% empty %}
-                    {% include "components/empty_state.html" with 
-                        icon="fa-check-circle" title="Todo en orden" 
-                        message="No hay productos con stock bajo" only %}
-                {% endfor %} {% endcomment %}
+        <div class="card-body tight">
+            <div class="empty-state">
+                <i class="fas fa-check-circle"></i>
+                <div class="empty-title">Todo en orden</div>
+                <div class="empty-sub">No hay productos con stock bajo</div>
             </div>
         </div>
     </div>
@@ -55,39 +53,33 @@
     <!-- Últimos Movimientos -->
     <div class="card">
         <div class="card-header">
-            <h2 class="card-title">
+            <div class="card-header-title">
                 <i class="fas fa-history"></i> Últimos 10 Movimientos
-            </h2>
-            <span class="card-badge info">Hoy</span>
+            </div>
+            <span class="badge badge-purple">Hoy</span>
         </div>
-        <div class="card-body" style="padding: 0;">
-            {% comment %} {% with headers=movimientos_headers rows=movimientos %}
-                {% include "components/data_table.html" with 
-                    headers=headers rows=rows 
-                    empty_message="No hay movimientos registrados hoy" only %}
-            {% endwith %} {% endcomment %}
+        <div class="card-body tight">
+            <div class="empty-state">
+                <i class="fas fa-exchange-alt"></i>
+                <div class="empty-title">Sin movimientos</div>
+                <div class="empty-sub">No hay movimientos registrados hoy</div>
+            </div>
         </div>
     </div>
 
     <!-- Proyectos Recientes -->
     <div class="card">
         <div class="card-header">
-            <h2 class="card-title">
+            <div class="card-header-title">
                 <i class="fas fa-project-diagram"></i> Últimos 5 Proyectos
-            </h2>
-            <a href="" class="link-arrow">
-                Ver todos <i class="fas fa-arrow-right"></i>
-            </a>
+            </div>
+            <a href="" class="card-link">Ver todos <i class="fas fa-arrow-right"></i></a>
         </div>
-        <div class="card-body">
-            <div class="project-list">
-                    {% comment %} {% for proyecto in proyectos %}
-                        {% include "components/project_card.html" with project=proyecto only %}
-                    {% empty %}
-                        {% include "components/empty_state.html" with 
-                            icon="fa-folder-open" title="Sin proyectos" 
-                            message="No hay proyectos activos" only %}
-                    {% endfor %} {% endcomment %}
+        <div class="card-body tight">
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <div class="empty-title">Sin proyectos</div>
+                <div class="empty-sub">No hay proyectos activos</div>
             </div>
         </div>
     </div>
@@ -95,29 +87,18 @@
     <!-- Actividad Reciente -->
     <div class="card">
         <div class="card-header">
-            <h2 class="card-title">
+            <div class="card-header-title">
                 <i class="fas fa-clock"></i> Actividad Reciente
-            </h2>
+            </div>
         </div>
-        <div class="card-body">
-            <div class="activity-list">
-                {% comment %} {% for actividad in actividades %}
-                <div class="activity-item">
-                    <div class="activity-icon {{ actividad.tipo }}">
-                        <i class="fas {{ actividad.icono }}"></i>
-                    </div>
-                    <div class="activity-details">
-                        <p>{{ actividad.descripcion }}</p>
-                        <small>{{ actividad.tiempo }}</small>
-                    </div>
-                </div>
-                {% empty %}
-                    {% include "components/empty_state.html" with 
-                        icon="fa-clock" title="Sin actividad" 
-                        message="No hay actividad reciente" only %}
-                {% endfor %} {% endcomment %}
+        <div class="card-body tight">
+            <div class="empty-state">
+                <i class="fas fa-clock"></i>
+                <div class="empty-title">Sin actividad</div>
+                <div class="empty-sub">No hay actividad reciente</div>
             </div>
         </div>
     </div>
+
 </div>
 {% endblock %}
