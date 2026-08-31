@@ -1,90 +1,129 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}Proyectos - AlmacenSys{% endblock %}
 
 {% block breadcrumb_items %}
-<strong>Proyectos</strong> / Listado
+<strong>Proyectos</strong>
+<span>/</span> <span>Listado</span>
 {% endblock %}
 
 {% block page_header %}
-<h1 class="page-title">Proyectos</h1>
-<p class="page-subtitle">Gestión de proyectos y consumo de materiales.</p>
+<div class="page-header">
+    <div>
+        <h1>Proyectos</h1>
+        <p>Da seguimiento a los proyectos activos y su consumo de material.</p>
+    </div>
+    <div class="header-actions">
+        <a href="#" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nuevo Proyecto
+        </a>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="table-toolbar">
-    <span class="card-badge info">{{ projects|length }} proyectos</span>
-    <a href="#" class="btn btn-primary btn-sm">
-        <i class="fas fa-folder-plus"></i> Nuevo Proyecto
-    </a>
+<!-- Toolbar: búsqueda + filtro por estado (JS de main.js) -->
+<div class="toolbar">
+    <div class="toolbar-left">
+        <div class="toolbar-search">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Buscar proyecto o código..."
+                   data-search-target="#grid-proyectos .project-card"
+                   data-empty-target="#proyectos-empty">
+        </div>
+        <select class="toolbar-select"
+                data-filter-target="#grid-proyectos .project-card"
+                data-filter-attr="data-estado">
+            <option value="all">Todos los estados</option>
+            <option value="en_progreso">En Curso</option>
+            <option value="planificado">Creado</option>
+            <option value="completado">Finalizado</option>
+            <option value="cancelado">Cancelado</option>
+        </select>
+    </div>
+    <span class="results-count">{{ projects|length }} proyectos</span>
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <h2 class="card-title">
-            <i class="fas fa-project-diagram"></i> Proyectos Activos
-        </h2>
-    </div>
-    <div class="card-body" style="padding: 0;">
-        {% if projects %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Código</th>
-                    <th>Nombre</th>
-                    <th>Estado</th>
-                    <th>Inicio</th>
-                    <th>Fin</th>
-                    <th class="text-center">Productos</th>
-                    <th class="text-right">Total Consumido</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for project in projects %}
-                <tr>
-                    <td><span class="badge-sku">{{ project.code }}</span></td>
-                    <td class="project-name">{{ project.name }}</td>
-                    <td>
-                        {% if project.status == "APPROVED" %}
-                        <span class="badge badge-success">En Curso</span>
-                        {% elif project.status == "CREATED" %}
-                        <span class="badge badge-info">Creado</span>
-                        {% elif project.status == "FINISHED" %}
-                        <span class="badge badge-warning">Finalizado</span>
-                        {% elif project.status == "CANCELLED" %}
-                        <span class="badge badge-danger">Cancelado</span>
-                        {% else %}
-                        <span class="badge badge-muted">{{ project.get_status_display }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ project.start_date|default:"—" }}</td>
-                    <td>{{ project.end_date|default:"—" }}</td>
-                    <td class="text-center">
-                        {% if project.product_count %}
-                        <span class="badge badge-info">{{ project.product_count }}</span>
-                        {% else %}
-                        <span class="badge badge-muted">0</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-right">
-                        {% if project.total_consumed %}
-                        <span class="badge badge-success">{{ project.total_consumed }}</span>
-                        {% else %}
-                        <span class="badge badge-muted">0</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">
-            <i class="fas fa-folder-open"></i>
-            <h3>No hay proyectos registrados</h3>
-            <p>Crea un proyecto para comenzar a asociar movimientos de inventario.</p>
+{% if projects %}
+<div class="grid-3" id="grid-proyectos">
+    {% for project in projects %}
+    <div class="project-card"
+         data-estado="{% if project.status == 'APPROVED' %}en_progreso{% elif project.status == 'CREATED' %}planificado{% elif project.status == 'FINISHED' %}completado{% elif project.status == 'CANCELLED' %}cancelado{% endif %}">
+
+        <div class="project-card-top">
+            <div class="project-card-icon">
+                {% if project.status == "APPROVED" %}
+                <i class="fas fa-bolt"></i>
+                {% elif project.status == "CREATED" %}
+                <i class="fas fa-folder-open"></i>
+                {% elif project.status == "FINISHED" %}
+                <i class="fas fa-check"></i>
+                {% elif project.status == "CANCELLED" %}
+                <i class="fas fa-ban"></i>
+                {% else %}
+                <i class="fas fa-project-diagram"></i>
+                {% endif %}
+            </div>
+            {% if project.status == "APPROVED" %}
+            <span class="badge badge-info"><span class="badge-dot" style="background:var(--info);"></span>En Curso</span>
+            {% elif project.status == "CREATED" %}
+            <span class="badge badge-neutral"><span class="badge-dot" style="background:var(--text-faint);"></span>Creado</span>
+            {% elif project.status == "FINISHED" %}
+            <span class="badge badge-success"><span class="badge-dot" style="background:var(--success);"></span>Finalizado</span>
+            {% elif project.status == "CANCELLED" %}
+            <span class="badge badge-danger"><span class="badge-dot" style="background:var(--danger);"></span>Cancelado</span>
+            {% else %}
+            <span class="badge badge-neutral"><span class="badge-dot" style="background:var(--text-faint);"></span>{{ project.get_status_display }}</span>
+            {% endif %}
         </div>
+
+        <div>
+            <h3>{{ project.name }}</h3>
+            <div class="client">{{ project.code }}</div>
+        </div>
+
+        {% if project.description %}
+        <div class="desc">{{ project.description }}</div>
         {% endif %}
+
+        <div class="project-card-meta">
+            <span>
+                <i class="fas fa-calendar"></i>
+                {% if project.start_date %}{{ project.start_date|date:"d M" }}{% else %}—{% endif %}
+                –
+                {% if project.end_date %}{{ project.end_date|date:"d M Y" }}{% else %}—{% endif %}
+            </span>
+        </div>
+
+        <div class="project-card-footer">
+            <div class="flex items-center gap-8">
+                {% if project.product_count %}
+                <span class="badge badge-info">{{ project.product_count }} productos</span>
+                {% else %}
+                <span class="badge badge-neutral">Sin productos</span>
+                {% endif %}
+                {% if project.total_consumed %}
+                <span class="badge badge-success">{{ project.total_consumed }} consumidos</span>
+                {% endif %}
+            </div>
+            <a href="" class="card-link">Ver detalle <i class="fas fa-arrow-right"></i></a>
+        </div>
+
     </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-folder-open"></i>
+    <div class="empty-title">No hay proyectos registrados</div>
+    <div class="empty-sub">Crea un proyecto para comenzar a asociar movimientos de inventario.</div>
+</div>
+{% endif %}
+
+<!-- Estado vacío para búsqueda/filtro sin resultados (lo controla main.js) -->
+<div class="empty-state" id="proyectos-empty" style="display: none;">
+    <i class="fas fa-search"></i>
+    <div class="empty-title">Sin resultados</div>
+    <div class="empty-sub">No se encontraron proyectos que coincidan con tu búsqueda.</div>
 </div>
 {% endblock %}
