@@ -645,6 +645,7 @@
 .btn i { font-size: 13px; }
 .card-header-title i { font-size: 16px; color: var(--purple); }
 .card-link i { font-size: 12px; }
+.action-btn i { font-size: 13px; }
 .form-section-title i { font-size: 14px; color: var(--purple); }
 .toolbar-search i {
     position: absolute;

@@ -188,6 +188,43 @@ class Product(models.Model):
             return False
         return stock <= self.minimum_stock
 
+    @property
+    def stock_state(self):
+        """Estado de stock como slug, para presentación y filtros.
+
+        Precedencia: inactivo > agotado > bajo > normal.
+        Requiere que `.stock` haya sido anexado con with_stock();
+        si no lo fue, se comporta como "normal" (o "inactivo"
+        según is_active), igual que is_low_stock.
+        """
+        if not self.is_active:
+            return "inactivo"
+        stock = getattr(self, "stock", None)
+        if stock is not None and stock <= 0:
+            return "agotado"
+        if self.is_low_stock:
+            return "bajo"
+        return "normal"
+
+    @property
+    def stock_level_pct(self):
+        """Porcentaje (0-100) de la barra de stock, para presentación.
+
+        Heurística: la barra se considera llena al alcanzar 2x el
+        stock mínimo.
+          - stock <= 0  -> 0
+          - sin mínimo  -> 100
+          - en otro caso -> min(100, stock / (minimo * 2) * 100)
+        Requiere que `.stock` haya sido anexado con with_stock().
+        """
+        stock = getattr(self, "stock", None)
+        if stock is None or stock <= 0:
+            return 0
+        minimum = self.minimum_stock
+        if minimum is None or minimum <= 0:
+            return 100
+        return min(100, round(stock / (minimum * 2) * 100))
+
     objects = ProductManager()
 
     class Meta:

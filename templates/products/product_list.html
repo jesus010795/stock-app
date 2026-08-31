@@ -1,92 +1,133 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}Productos - AlmacenSys{% endblock %}
 
 {% block breadcrumb_items %}
-<strong>Productos</strong> / Listado
+<strong>Productos</strong>
+<span>/</span> <span>Listado</span>
 {% endblock %}
 
 {% block page_header %}
-<h1 class="page-title">Productos</h1>
-<p class="page-subtitle">Catálogo de productos y stock actual del almacén.</p>
+<div class="page-header">
+    <div>
+        <h1>Productos</h1>
+        <p>Consulta y administra el inventario de productos del almacén.</p>
+    </div>
+    <div class="header-actions">
+        <a href="#" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Agregar Producto
+        </a>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="table-toolbar">
-    <span class="card-badge info">{{ products|length }} productos</span>
-    <a href="#" class="btn btn-primary btn-sm">
-        <i class="fas fa-plus"></i> Nuevo Producto
-    </a>
+<!-- Toolbar: búsqueda + filtros por categoría y estado (JS de main.js) -->
+<div class="toolbar">
+    <div class="toolbar-left">
+        <div class="toolbar-search">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Buscar por nombre o código..."
+                   data-search-target="#tabla-productos tbody tr"
+                   data-empty-target="#productos-empty">
+        </div>
+        <select class="toolbar-select"
+                data-filter-target="#tabla-productos tbody tr"
+                data-filter-attr="data-categoria">
+            <option value="all">Todas las categorías</option>
+            {% for category in categories %}
+            <option value="{{ category.name|slugify }}">{{ category.name }}</option>
+            {% endfor %}
+        </select>
+        <select class="toolbar-select"
+                data-filter-target="#tabla-productos tbody tr"
+                data-filter-attr="data-estado">
+            <option value="all">Todos los estados</option>
+            <option value="normal">Stock normal</option>
+            <option value="bajo">Stock bajo</option>
+            <option value="agotado">Agotado</option>
+            <option value="inactivo">Inactivo</option>
+        </select>
+    </div>
+    <span class="results-count">{{ products|length }} productos</span>
 </div>
 
+{% if products %}
 <div class="card">
-    <div class="card-header">
-        <h2 class="card-title">
-            <i class="fas fa-boxes"></i> Inventario
-        </h2>
-    </div>
-    <div class="card-body" style="padding: 0;">
-        {% if products %}
-        <table class="table">
+    <div class="table-wrap">
+        <table class="data-table" id="tabla-productos">
             <thead>
                 <tr>
-                    <th>SKU</th>
-                    <th>Nombre</th>
+                    <th>Producto</th>
+                    <th>Código</th>
                     <th>Categoría</th>
-                    <th>Unidad</th>
-                    <th>Almacén</th>
-                    <th class="text-right">Stock Actual</th>
-                    <th class="text-center">Estado</th>
+                    <th>Stock</th>
+                    <th>Ubicación</th>
+                    <th>Estado</th>
+                    <th style="text-align:right;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for product in products %}
-                <tr>
-                    <td><span class="badge-sku">{{ product.sku }}</span></td>
-                    <td class="product-name">{{ product.name }}</td>
+                <tr data-categoria="{{ product.category.name|slugify }}"
+                    data-estado="{{ product.stock_state }}">
                     <td>
-                        {% if product.category %}
-                        <span class="badge badge-info">{{ product.category.name }}</span>
-                        {% else %}
-                        <span class="badge badge-muted">—</span>
-                        {% endif %}
+                        <div class="table-product">
+                            <div class="table-thumb">{{ product.name|slice:":2"|upper }}</div>
+                            <span class="cell-primary">{{ product.name }}</span>
+                        </div>
                     </td>
-                    <td>{{ product.unit.abbreviation }}</td>
+                    <td class="cell-mono">{{ product.sku }}</td>
+                    <td><span class="badge badge-info">{{ product.category.name }}</span></td>
                     <td>
-                        {% if product.warehouse %}
-                        <span class="table-cell-icon">
-                            <i class="fas fa-warehouse"></i> {{ product.warehouse.name }}
-                        </span>
+                        <div class="stock-bar-wrap">
+                            <div class="stock-bar">
+                                <div class="stock-bar-fill {% if product.stock_state == 'agotado' %}low{% elif product.stock_state == 'bajo' %}mid{% endif %}"
+                                     style="width:{{ product.stock_level_pct }}%;"></div>
+                            </div>
+                            <span class="cell-muted">{{ product.stock|floatformat:"-2" }} {{ product.unit.abbreviation }}</span>
+                        </div>
+                    </td>
+                    <td class="cell-muted">
+                        {% if product.warehouse %}{{ product.warehouse.name }}{% else %}Sin almacén{% endif %}
+                    </td>
+                    <td>
+                        {% if product.stock_state == "inactivo" %}
+                        <span class="badge badge-neutral"><span class="badge-dot" style="background:var(--text-faint);"></span>Inactivo</span>
+                        {% elif product.stock_state == "agotado" %}
+                        <span class="badge badge-danger"><span class="badge-dot" style="background:var(--danger);"></span>Agotado</span>
+                        {% elif product.stock_state == "bajo" %}
+                        <span class="badge badge-warning"><span class="badge-dot" style="background:var(--warning);"></span>Stock bajo</span>
                         {% else %}
-                        <span class="badge badge-muted">Sin almacén</span>
+                        <span class="badge badge-success"><span class="badge-dot" style="background:var(--success);"></span>Normal</span>
                         {% endif %}
                     </td>
-                    <td class="text-right">
-                        {% if product.is_low_stock %}
-                        <span class="badge badge-warning">{{ product.stock }}</span>
-                        {% else %}
-                        <span class="badge badge-success">{{ product.stock }}</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-center">
-                        {% if product.is_active %}
-                        <span class="badge badge-success">Activo</span>
-                        {% else %}
-                        <span class="badge badge-danger">Inactivo</span>
-                        {% endif %}
+                    <td>
+                        <div class="row-actions" style="justify-content:flex-end;">
+                            <a href="{% url 'inventory:nuevo' %}?producto={{ product.pk }}"
+                               class="action-btn"
+                               aria-label="Ajustar stock con movimiento"
+                               title="Ajustar stock con movimiento">
+                                <i class="fas fa-exchange-alt"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% else %}
-        <div class="empty-state">
-            <i class="fas fa-box-open"></i>
-            <h3>No hay productos registrados</h3>
-            <p>Agrega tu primer producto para comenzar a gestionar el inventario.</p>
+        <div class="empty-state" id="productos-empty" style="display: none;">
+            <i class="fas fa-search"></i>
+            <div class="empty-title">Sin resultados</div>
+            <div class="empty-sub">No se encontraron productos que coincidan con tu búsqueda.</div>
         </div>
-        {% endif %}
     </div>
 </div>
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-box-open"></i>
+    <div class="empty-title">No hay productos registrados</div>
+    <div class="empty-sub">Agrega tu primer producto para comenzar a gestionar el inventario.</div>
+</div>
+{% endif %}
 {% endblock %}
