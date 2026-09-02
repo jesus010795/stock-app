@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}{{ employee.full_name }} - AlmacenSys{% endblock %}
+
+{% block breadcrumb_items %}
+<a href="{% url 'employees:employees_list' %}">Empleados</a>
+<span>/</span> <span>{{ employee.full_name }}</span>
+{% endblock %}
+
+{% block content %}
+
+<!-- ===== Cabecera del perfil ===== -->
+<div class="profile-header">
+    <div class="profile-header-left">
+        <div class="avatar-lg">{{ employee.initials }}</div>
+        <div>
+            <div class="profile-name">
+                <h1>{{ employee.full_name }}</h1>
+                {% if employee.is_active %}
+                <span class="badge badge-success"><span class="badge-dot" style="background:var(--success);"></span>Activo</span>
+                {% else %}
+                <span class="badge badge-neutral"><span class="badge-dot" style="background:var(--text-faint);"></span>Inactivo</span>
+                {% endif %}
+            </div>
+            <div class="profile-role">Departamento de {{ employee.department.name }}</div>
+            <div class="profile-meta">
+                <span>
+                    <i class="fas fa-calendar"></i>
+                    Ingresó el {{ employee.created_at|date:"d M Y" }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center" style="gap:26px;">
+        <div class="profile-stats">
+            <div class="stat-inline">
+                <div class="stat-num">{{ project_count }}</div>
+                <div class="stat-label">Proyectos</div>
+            </div>
+            <div class="stat-inline">
+                <div class="stat-num">{{ employee.total_movements }}</div>
+                <div class="stat-label">Movimientos</div>
+            </div>
+            <div class="stat-inline">
+                <div class="stat-num">{{ employee.years_in_company }}</div>
+                <div class="stat-label">Años en la empresa</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Últimos movimientos + proyectos ===== -->
+<div class="grid-2" style="align-items:start;">
+
+    <!-- Últimos 10 movimientos -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <i class="fas fa-history"></i> Últimos 10 Movimientos
+            </div>
+        </div>
+        <div class="card-body tight">
+            {% if recent_movements %}
+            {% for movement in recent_movements %}
+            <div class="mini-move-row">
+                {% if movement.signed_quantity < 0 %}
+                <div class="move-icon out"><i class="fas fa-arrow-up"></i></div>
+                {% else %}
+                <div class="move-icon in"><i class="fas fa-arrow-down"></i></div>
+                {% endif %}
+                <div class="mini-move-info">
+                    <div class="title">{{ movement.product.name }}</div>
+                    <div class="sub">
+                        {% if movement.movement_type == "AJUST" %}
+                        Ajuste ({{ movement.get_adjustment_type_display }})
+                        {% else %}
+                        {{ movement.get_movement_type_display }}
+                        {% endif %}
+                        · {% if movement.project %}{{ movement.project.name }}{% else %}Sin proyecto{% endif %}
+                        · {{ movement.created_at|date:"d M Y" }}
+                    </div>
+                </div>
+                <div class="mini-move-qty {% if movement.signed_quantity < 0 %}out{% else %}in{% endif %}">
+                    {{ movement.signed_quantity|floatformat:"-2" }} {{ movement.product.unit.abbreviation }}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-exchange-alt"></i>
+                <div class="empty-title">Sin movimientos</div>
+                <div class="empty-sub">Este empleado aún no registra movimientos.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Últimos 5 proyectos -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <i class="fas fa-project-diagram"></i> Últimos 5 Proyectos
+            </div>
+            <a href="{% url 'projects:projects_list' %}" class="card-link">Ver todos <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="card-body tight">
+            {% if recent_projects %}
+            {% for project in recent_projects %}
+            <div class="mini-project-row">
+                <div class="mini-project-info">
+                    <div class="project-card-icon" style="width:34px;height:34px;">
+                        {% if project.status == "APPROVED" %}
+                        <i class="fas fa-bolt"></i>
+                        {% elif project.status == "CREATED" %}
+                        <i class="fas fa-folder-open"></i>
+                        {% elif project.status == "FINISHED" %}
+                        <i class="fas fa-check"></i>
+                        {% else %}
+                        <i class="fas fa-ban"></i>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="name">{{ project.name }}</div>
+                        <div class="date">
+                            {% if project.start_date %}{{ project.start_date|date:"d M" }}{% else %}—{% endif %}
+                            –
+                            {% if project.end_date %}{{ project.end_date|date:"d M Y" }}{% else %}—{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% if project.status == "APPROVED" %}
+                <span class="badge badge-info"><span class="badge-dot" style="background:var(--info);"></span>En Curso</span>
+                {% elif project.status == "CREATED" %}
+                <span class="badge badge-neutral"><span class="badge-dot" style="background:var(--text-faint);"></span>Creado</span>
+                {% elif project.status == "FINISHED" %}
+                <span class="badge badge-success"><span class="badge-dot" style="background:var(--success);"></span>Finalizado</span>
+                {% else %}
+                <span class="badge badge-danger"><span class="badge-dot" style="background:var(--danger);"></span>Cancelado</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <div class="empty-title">Sin proyectos</div>
+                <div class="empty-sub">Este empleado aún no registra movimientos en proyectos.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== Historial de salidas agrupado por proyecto ===== -->
+<div style="margin-top:28px;">
+    <div class="page-header" style="margin-bottom:14px;">
+        <div>
+            <h1 style="font-size:18px;">Historial de Salidas y Peticiones</h1>
+            <p style="margin-top:4px;">Agrupado por proyecto. Haz clic en una tarjeta para ver el detalle de los productos solicitados.</p>
+        </div>
+    </div>
+
+    {% if exit_groups %}
+    {% for group in exit_groups %}
+    <div class="group-card">
+        <div class="group-header" onclick="toggleGroup(this)">
+            <div class="group-header-left">
+                <div class="icon">
+                    {% if not group.project %}
+                    <i class="fas fa-inbox"></i>
+                    {% elif group.project.status == "APPROVED" %}
+                    <i class="fas fa-bolt"></i>
+                    {% elif group.project.status == "CREATED" %}
+                    <i class="fas fa-folder-open"></i>
+                    {% elif group.project.status == "FINISHED" %}
+                    <i class="fas fa-check"></i>
+                    {% else %}
+                    <i class="fas fa-ban"></i>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="group-title">
+                        {% if group.project %}{{ group.project.name }}{% else %}Sin proyecto{% endif %}
+                    </div>
+                    <div class="group-sub">
+                        {% if group.project %}
+                        {{ group.project.code }} · {{ group.project.get_status_display }}
+                        {% else %}
+                        Salidas sin proyecto asociado
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="group-header-right">
+                <span class="group-count">{{ group.movements|length }} salidas</span>
+                <div class="chevron"><i class="fas fa-chevron-down"></i></div>
+            </div>
+        </div>
+        <div class="group-body">
+            {% for movement in group.movements %}
+            <div class="group-item">
+                <div class="group-item-thumb">{{ movement.product.name|slice:":2"|upper }}</div>
+                <div class="group-item-info">
+                    <div class="name">{{ movement.product.name }}</div>
+                    <div class="meta">
+                        {{ movement.created_at|date:"d M Y" }}
+                        · {% if movement.warehouse %}{{ movement.warehouse.name }}{% else %}Sin almacén{% endif %}
+                    </div>
+                </div>
+                <div class="group-item-qty">{{ movement.signed_quantity|floatformat:"-2" }} {{ movement.product.unit.abbreviation }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <div class="empty-title">Sin salidas registradas</div>
+        <div class="empty-sub">Cuando este empleado registre salidas aparecerán agrupadas por proyecto.</div>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

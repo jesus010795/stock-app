@@ -116,3 +116,77 @@ class Employee(models.Model):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+
+    @property
+    def initials(self):
+        """Iniciales para el avatar de presentación (p. ej. "AM")."""
+        return f"{self.first_name[:1]}{self.last_name[:1]}".upper()
+
+    @property
+    def years_in_company(self):
+        """Antigüedad en años, con 1 decimal (para presentación)."""
+        from django.utils import timezone
+
+        days = (timezone.now() - self.created_at).days
+        return round(days / 365.25, 1)
+
+    def total_movements(self):
+        """Cantidad total de movimientos registrados por el empleado."""
+        return self.movements.count()
+
+    def recent_movements(self, limit=10):
+        """Últimos movimientos registrados por el empleado.
+
+        Retorna un queryset optimizado para la ficha del empleado:
+        producto (con unidad), proyecto y almacén precargados.
+        """
+        from inventory.models import Movement
+
+        return (
+            Movement.objects.filter(employee=self)
+            .select_related("product__unit", "project", "warehouse")
+            .order_by("-created_at")[:limit]
+        )
+
+    def consumed_projects(self, limit=None):
+        """Proyectos con movimientos registrados por el empleado.
+
+        Distinct por proyecto, ordenados del más reciente al más
+        antiguo según su fecha de registro. `limit` recorta la lista.
+        """
+        from projects.models import Project
+
+        qs = (
+            Project.objects.filter(movements__employee=self)
+            .distinct()
+            .order_by("-created_at")
+        )
+        if limit:
+            qs = qs[:limit]
+        return qs
+
+    def exit_groups(self):
+        """Historial de salidas del empleado agrupado por proyecto.
+
+        Retorna una lista de diccionarios [{"project", "movements"}]
+        con los proyectos ordenados por su salida más reciente y, dentro
+        de cada grupo, las salidas también de la más reciente a la más
+        antigua. Los movimientos sin proyecto se agrupan con project=None.
+        """
+        from collections import OrderedDict
+
+        from inventory.models import Movement, MovementType
+
+        movements = (
+            Movement.objects.filter(employee=self, movement_type=MovementType.EXIT)
+            .select_related("product__unit", "project", "warehouse")
+            .order_by("-created_at")
+        )
+
+        groups = OrderedDict()
+        for movement in movements:
+            groups.setdefault(movement.project, []).append(movement)
+        return [
+            {"project": project, "movements": items}
+            for project, items in groups.items()
+        ]
