@@ -103,6 +103,24 @@ class Employee(models.Model):
         """
         return getattr(self, "_total_qty", 0) or 0
 
+    @property
+    def project_product_count(self):
+        """Productos distintos consumidos por el empleado EN UN proyecto.
+
+        Requiere que el queryset haya sido anotado con
+        _project_product_count (ver Project.involved_employees()).
+        """
+        return getattr(self, "_project_product_count", 0) or 0
+
+    @property
+    def project_total_consumed(self):
+        """Unidades totales consumidas (salidas) por el empleado EN UN proyecto.
+
+        Requiere que el queryset haya sido anotado con _project_total_qty
+        (ver Project.involved_employees()).
+        """
+        return getattr(self, "_project_total_qty", 0) or 0
+
     objects = EmployeeManager()
 
     class Meta:

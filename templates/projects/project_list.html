@@ -79,7 +79,11 @@
 
         <div>
             <h3>{{ project.name }}</h3>
+            {% if project.client %}
+            <div class="client">{{ project.client }}</div>
+            {% else %}
             <div class="client">{{ project.code }}</div>
+            {% endif %}
         </div>
 
         {% if project.description %}
@@ -106,7 +110,7 @@
                 <span class="badge badge-success">{{ project.total_consumed }} consumidos</span>
                 {% endif %}
             </div>
-            <a href="" class="card-link">Ver detalle <i class="fas fa-arrow-right"></i></a>
+            <a href="{% url 'projects:project_detail' project.pk %}" class="card-link">Ver detalle <i class="fas fa-arrow-right"></i></a>
         </div>
 
     </div>

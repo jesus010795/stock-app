@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - AlmacenSys{% endblock %}
+
+{% block breadcrumb_items %}
+<a href="{% url 'projects:projects_list' %}">Proyectos</a>
+<span>/</span> <span>{{ project.name }}</span>
+{% endblock %}
+
+{% block content %}
+
+<!-- ===== Cabecera del perfil ===== -->
+<div class="profile-header">
+    <div class="profile-header-left">
+        <div class="avatar-lg">
+            {% if project.status == "APPROVED" %}
+            <i class="fas fa-bolt"></i>
+            {% elif project.status == "CREATED" %}
+            <i class="fas fa-folder-open"></i>
+            {% elif project.status == "FINISHED" %}
+            <i class="fas fa-check"></i>
+            {% else %}
+            <i class="fas fa-ban"></i>
+            {% endif %}
+        </div>
+        <div>
+            <div class="profile-name">
+                <h1>{{ project.name }}</h1>
+                {% if project.status == "APPROVED" %}
+                <span class="badge badge-info"><span class="badge-dot" style="background:var(--info);"></span>En Curso</span>
+                {% elif project.status == "CREATED" %}
+                <span class="badge badge-neutral"><span class="badge-dot" style="background:var(--text-faint);"></span>Creado</span>
+                {% elif project.status == "FINISHED" %}
+                <span class="badge badge-success"><span class="badge-dot" style="background:var(--success);"></span>Finalizado</span>
+                {% else %}
+                <span class="badge badge-danger"><span class="badge-dot" style="background:var(--danger);"></span>Cancelado</span>
+                {% endif %}
+            </div>
+            <div class="profile-role">
+                {% if project.client %}{{ project.client }}{% else %}Sin cliente{% endif %}
+            </div>
+            <div class="profile-meta">
+                <span><i class="fas fa-barcode"></i> {{ project.code }}</span>
+                <span>
+                    <i class="fas fa-calendar"></i>
+                    Inicio: {% if project.start_date %}{{ project.start_date|date:"d M Y" }}{% else %}—{% endif %}
+                </span>
+                <span>
+                    <i class="fas fa-calendar-check"></i>
+                    Fin: {% if project.end_date %}{{ project.end_date|date:"d M Y" }}{% else %}—{% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center" style="gap:26px;">
+        <div class="profile-stats">
+            <div class="stat-inline">
+                <div class="stat-num">{{ movement_count }}</div>
+                <div class="stat-label">Movimientos</div>
+            </div>
+            <div class="stat-inline">
+                <div class="stat-num">{{ project.product_count }}</div>
+                <div class="stat-label">Productos distintos</div>
+            </div>
+            <div class="stat-inline">
+                <div class="stat-num">{{ project.total_consumed|floatformat:"-2" }}</div>
+                <div class="stat-label">Total consumido</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Últimos movimientos + empleados participantes ===== -->
+<div class="grid-2" style="align-items:start;">
+
+    <!-- Últimos 10 movimientos -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <i class="fas fa-history"></i> Últimos 10 Movimientos
+            </div>
+        </div>
+        <div class="card-body tight">
+            {% if recent_movements %}
+            {% for movement in recent_movements %}
+            <div class="mini-move-row">
+                {% if movement.signed_quantity < 0 %}
+                <div class="move-icon out"><i class="fas fa-arrow-up"></i></div>
+                {% else %}
+                <div class="move-icon in"><i class="fas fa-arrow-down"></i></div>
+                {% endif %}
+                <div class="mini-move-info">
+                    <div class="title">{{ movement.product.name }}</div>
+                    <div class="sub">
+                        {% if movement.movement_type == "AJUST" %}
+                        Ajuste ({{ movement.get_adjustment_type_display }})
+                        {% else %}
+                        {{ movement.get_movement_type_display }}
+                        {% endif %}
+                        · {% if movement.employee %}{{ movement.employee.full_name }}{% else %}Sin empleado{% endif %}
+                        · {{ movement.created_at|date:"d M Y" }}
+                    </div>
+                </div>
+                <div class="mini-move-qty {% if movement.signed_quantity < 0 %}out{% else %}in{% endif %}">
+                    {{ movement.signed_quantity|floatformat:"-2" }} {{ movement.product.unit.abbreviation }}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-exchange-alt"></i>
+                <div class="empty-title">Sin movimientos</div>
+                <div class="empty-sub">Este proyecto aún no registra movimientos.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Empleados participantes -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <i class="fas fa-users"></i> Empleados Participantes
+            </div>
+        </div>
+        <div class="card-body tight">
+            {% if involved_employees %}
+            {% for employee in involved_employees %}
+            <div class="mini-project-row">
+                <div class="mini-project-info">
+                    <div class="avatar-md" style="background:linear-gradient(135deg, #6ea8fe, var(--purple));">{{ employee.initials }}</div>
+                    <div>
+                        <div class="name">{{ employee.full_name }}</div>
+                        <div class="date">{{ employee.department.name }}</div>
+                    </div>
+                </div>
+                {% if employee.project_total_consumed %}
+                <span class="badge badge-danger">{{ employee.project_total_consumed|floatformat:"-2" }} consumidos</span>
+                {% else %}
+                <span class="badge badge-neutral">Sin salidas</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-user-slash"></i>
+                <div class="empty-title">Sin participantes</div>
+                <div class="empty-sub">Ningún empleado ha registrado movimientos en este proyecto.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== Historial de salidas agrupado por empleado ===== -->
+<div style="margin-top:28px;">
+    <div class="page-header" style="margin-bottom:14px;">
+        <div>
+            <h1 style="font-size:18px;">Historial de Salidas por Empleado</h1>
+            <p style="margin-top:4px;">Agrupado por empleado. Haz clic en una tarjeta para ver el detalle de los productos solicitados.</p>
+        </div>
+    </div>
+
+    {% if exit_groups %}
+    {% for group in exit_groups %}
+    <div class="group-card">
+        <div class="group-header" onclick="toggleGroup(this)">
+            <div class="group-header-left">
+                <div class="icon">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div>
+                    <div class="group-title">
+                        {% if group.employee %}{{ group.employee.full_name }}{% else %}Sin empleado{% endif %}
+                    </div>
+                    <div class="group-sub">
+                        {% if group.employee %}
+                        {{ group.employee.department.name }}
+                        {% else %}
+                        Salidas sin empleado asociado
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="group-header-right">
+                <span class="group-count">{{ group.movements|length }} salidas</span>
+                <div class="chevron"><i class="fas fa-chevron-down"></i></div>
+            </div>
+        </div>
+        <div class="group-body">
+            {% for movement in group.movements %}
+            <div class="group-item">
+                <div class="group-item-thumb">{{ movement.product.name|slice:":2"|upper }}</div>
+                <div class="group-item-info">
+                    <div class="name">{{ movement.product.name }}</div>
+                    <div class="meta">
+                        {{ movement.created_at|date:"d M Y" }}
+                        · {% if movement.warehouse %}{{ movement.warehouse.name }}{% else %}Sin almacén{% endif %}
+                    </div>
+                </div>
+                <div class="group-item-qty">{{ movement.signed_quantity|floatformat:"-2" }} {{ movement.product.unit.abbreviation }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <div class="empty-title">Sin salidas registradas</div>
+        <div class="empty-sub">Cuando este proyecto registre salidas aparecerán agrupadas por empleado.</div>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

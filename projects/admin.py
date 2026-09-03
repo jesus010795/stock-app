@@ -34,14 +34,14 @@ class ProjectAdmin(admin.ModelAdmin):
         "created_at",
     ]
     list_filter = ["status"]
-    search_fields = ["code", "name", "description"]
+    search_fields = ["code", "name", "description", "client"]
     ordering = ["code"]
     list_editable = ["status"]
     readonly_fields = ["product_count", "total_consumption", "created_at"]
     inlines = [ConsumedProductsInline]
 
     fieldsets = (
-        ("Información Principal", {"fields": ("code", "name", "description")}),
+        ("Información Principal", {"fields": ("code", "name", "client", "description")}),
         ("Cronología", {"fields": ("start_date", "end_date")}),
         ("Estado", {"fields": ("status",)}),
         (
