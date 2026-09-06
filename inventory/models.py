@@ -34,6 +34,17 @@ class MovementQuerySet(models.QuerySet):
     def adjustments(self):
         return self.filter(movement_type=MovementType.ADJUSTMENT)
 
+    def recent(self, limit=10):
+        """Últimos movimientos registrados, del más reciente al más antiguo.
+
+        Precarga producto (con unidad), empleado, proyecto y almacén
+        para las tarjetas del dashboard y las fichas de detalle.
+        """
+        return (
+            self.select_related("product__unit", "employee", "project", "warehouse")
+            .order_by("-created_at")[:limit]
+        )
+
     def with_product_stock(self):
         from django.db.models import Case, When, Value, F, DecimalField
         from django.db.models.functions import Coalesce
@@ -80,6 +91,9 @@ class MovementManager(models.Manager):
 
     def adjustments(self):
         return self.get_queryset().adjustments()
+
+    def recent(self, limit=10):
+        return self.get_queryset().recent(limit)
 
     def with_product_stock(self):
         return self.get_queryset().with_product_stock()
@@ -280,3 +294,55 @@ class Movement(models.Model):
                 return self.quantity
             return -self.quantity
         return self.quantity
+
+    @classmethod
+    def get_recent_activity(cls, limit=5):
+        """Feed mixto de actividad reciente para el dashboard.
+
+        Combina movimientos, proyectos creados y empleados agregados,
+        ordenados del más reciente al más antiguo. Cada evento es un
+        diccionario {icon, fa, actor, action, target, created_at} con la
+        redacción resuelta en el modelo, para que la plantilla solo pinte.
+        """
+        events = []
+
+        for movement in cls.objects.recent(limit=limit):
+            if movement.movement_type == MovementType.EXIT:
+                icon, fa, action = "danger", "fa-arrow-up", "registró una salida de"
+            elif movement.movement_type == MovementType.ENTRY:
+                icon, fa, action = "success", "fa-arrow-down", "registró una entrada de"
+            elif movement.adjustment_type == AdjustmentType.IN:
+                icon, fa, action = "info", "fa-arrow-up", "registró un ajuste de aumento de"
+            else:
+                icon, fa, action = "info", "fa-arrow-down", "registró un ajuste de disminución de"
+            events.append({
+                "icon": icon,
+                "fa": fa,
+                "actor": movement.employee.full_name if movement.employee else "Sistema",
+                "action": action,
+                "target": movement.product.name,
+                "created_at": movement.created_at,
+            })
+
+        for project in Project.objects.recent(limit=limit):
+            events.append({
+                "icon": "purple",
+                "fa": "fa-project-diagram",
+                "actor": project.name,
+                "action": "fue creado en el sistema",
+                "target": None,
+                "created_at": project.created_at,
+            })
+
+        for employee in Employee.objects.order_by("-created_at")[:limit]:
+            events.append({
+                "icon": "info",
+                "fa": "fa-user-plus",
+                "actor": employee.full_name,
+                "action": "fue agregado al área de",
+                "target": employee.department.name,
+                "created_at": employee.created_at,
+            })
+
+        events.sort(key=lambda event: event["created_at"], reverse=True)
+        return events[:limit]

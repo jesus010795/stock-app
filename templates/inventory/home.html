@@ -39,14 +39,39 @@
             <div class="card-header-title">
                 <i class="fas fa-exclamation-triangle"></i> Alertas de Stock Bajo
             </div>
-            <span class="badge badge-warning">0 productos</span>
+            <span class="badge badge-warning">{{ low_stock_products|length }} productos</span>
         </div>
         <div class="card-body tight">
+            {% if low_stock_products %}
+            <div class="alert-list">
+                {% for product in low_stock_products|slice:":6" %}
+                <div class="alert-item">
+                    {% if product.stock_state == "agotado" %}
+                    <div class="alert-icon critical"><i class="fas fa-exclamation-triangle"></i></div>
+                    {% else %}
+                    <div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    {% endif %}
+                    <div class="alert-info">
+                        <div class="name">{{ product.name }}</div>
+                        <div class="detail">
+                            {% if product.stock_state == "agotado" %}Agotado{% else %}Stock bajo{% endif %}
+                            · <strong>{{ product.stock|floatformat:"-2" }} de {{ product.minimum_stock|floatformat:"-2" }}</strong>
+                            {{ product.unit.abbreviation }}
+                        </div>
+                    </div>
+                    <a href="{% url 'products:products_list' %}" class="action-btn alert-action" aria-label="Ver producto">
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
             <div class="empty-state">
                 <i class="fas fa-check-circle"></i>
                 <div class="empty-title">Todo en orden</div>
                 <div class="empty-sub">No hay productos con stock bajo</div>
             </div>
+            {% endif %}
         </div>
     </div>
 
@@ -56,14 +81,36 @@
             <div class="card-header-title">
                 <i class="fas fa-history"></i> Últimos 10 Movimientos
             </div>
-            <span class="badge badge-purple">Hoy</span>
         </div>
         <div class="card-body tight">
+            {% if recent_movements %}
+            {% for movement in recent_movements %}
+            <div class="mini-move-row">
+                {% if movement.signed_quantity < 0 %}
+                <div class="move-icon out"><i class="fas fa-arrow-up"></i></div>
+                {% else %}
+                <div class="move-icon in"><i class="fas fa-arrow-down"></i></div>
+                {% endif %}
+                <div class="mini-move-info">
+                    <div class="title">{{ movement.product.name }}</div>
+                    <div class="sub">
+                        {% if movement.employee %}{{ movement.employee.full_name }}{% else %}Sin empleado{% endif %}
+                        · {% if movement.project %}{{ movement.project.name }}{% else %}Sin proyecto{% endif %}
+                        · {{ movement.created_at|date:"d M Y" }}
+                    </div>
+                </div>
+                <div class="mini-move-qty {% if movement.signed_quantity < 0 %}out{% else %}in{% endif %}">
+                    {{ movement.signed_quantity|floatformat:"-2" }} {{ movement.product.unit.abbreviation }}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
             <div class="empty-state">
                 <i class="fas fa-exchange-alt"></i>
                 <div class="empty-title">Sin movimientos</div>
-                <div class="empty-sub">No hay movimientos registrados hoy</div>
+                <div class="empty-sub">No hay movimientos registrados.</div>
             </div>
+            {% endif %}
         </div>
     </div>
 
@@ -73,14 +120,51 @@
             <div class="card-header-title">
                 <i class="fas fa-project-diagram"></i> Últimos 5 Proyectos
             </div>
-            <a href="" class="card-link">Ver todos <i class="fas fa-arrow-right"></i></a>
+            <a href="{% url 'projects:projects_list' %}" class="card-link">Ver todos <i class="fas fa-arrow-right"></i></a>
         </div>
         <div class="card-body tight">
+            {% if recent_projects %}
+            {% for project in recent_projects %}
+            <div class="mini-project-row">
+                <div class="mini-project-info">
+                    <div class="project-card-icon" style="width:34px;height:34px;">
+                        {% if project.status == "APPROVED" %}
+                        <i class="fas fa-bolt"></i>
+                        {% elif project.status == "CREATED" %}
+                        <i class="fas fa-folder-open"></i>
+                        {% elif project.status == "FINISHED" %}
+                        <i class="fas fa-check"></i>
+                        {% else %}
+                        <i class="fas fa-ban"></i>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="name">{{ project.name }}</div>
+                        <div class="date">
+                            {% if project.start_date %}{{ project.start_date|date:"d M" }}{% else %}—{% endif %}
+                            –
+                            {% if project.end_date %}{{ project.end_date|date:"d M Y" }}{% else %}—{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% if project.status == "APPROVED" %}
+                <span class="badge badge-info"><span class="badge-dot" style="background:var(--info);"></span>En Curso</span>
+                {% elif project.status == "CREATED" %}
+                <span class="badge badge-neutral"><span class="badge-dot" style="background:var(--text-faint);"></span>Creado</span>
+                {% elif project.status == "FINISHED" %}
+                <span class="badge badge-success"><span class="badge-dot" style="background:var(--success);"></span>Finalizado</span>
+                {% else %}
+                <span class="badge badge-danger"><span class="badge-dot" style="background:var(--danger);"></span>Cancelado</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% else %}
             <div class="empty-state">
                 <i class="fas fa-folder-open"></i>
                 <div class="empty-title">Sin proyectos</div>
-                <div class="empty-sub">No hay proyectos activos</div>
+                <div class="empty-sub">No hay proyectos registrados.</div>
             </div>
+            {% endif %}
         </div>
     </div>
 
@@ -92,11 +176,25 @@
             </div>
         </div>
         <div class="card-body tight">
+            {% if recent_activity %}
+            <div class="activity-list">
+                {% for item in recent_activity %}
+                <div class="activity-item">
+                    <div class="activity-icon {{ item.icon }}"><i class="fas {{ item.fa }}"></i></div>
+                    <div class="activity-details">
+                        <p><strong>{{ item.actor }}</strong> {{ item.action }}{% if item.target %} <strong>{{ item.target }}</strong>{% endif %}</p>
+                        <small>Hace {{ item.created_at|timesince }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
             <div class="empty-state">
                 <i class="fas fa-clock"></i>
                 <div class="empty-title">Sin actividad</div>
-                <div class="empty-sub">No hay actividad reciente</div>
+                <div class="empty-sub">No hay actividad reciente.</div>
             </div>
+            {% endif %}
         </div>
     </div>
 

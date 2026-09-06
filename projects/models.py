@@ -25,6 +25,10 @@ class ProjectQuerySet(models.QuerySet):
     def active(self):
         return self.filter(status__in=[ProjectStatus.CREATED, ProjectStatus.APPROVED])
 
+    def recent(self, limit=5):
+        """Últimos proyectos registrados, del más reciente al más antiguo."""
+        return self.order_by("-created_at")[:limit]
+
 
 class ProjectManager(models.Manager):
     def get_queryset(self):
@@ -35,6 +39,9 @@ class ProjectManager(models.Manager):
 
     def active(self):
         return self.get_queryset().active()
+
+    def recent(self, limit=5):
+        return self.get_queryset().recent(limit)
 
 
 class Project(models.Model):

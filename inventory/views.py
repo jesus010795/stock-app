@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.views.generic import CreateView, TemplateView
 from products.models import Product
+from projects.models import Project
 from .models import Movement
 from .forms import MovementForm
 from django.urls import reverse_lazy
@@ -10,6 +11,14 @@ from django.contrib import messages
 # Create your views here.
 class HomeView(TemplateView):
     template_name = "inventory/home.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["low_stock_products"] = Product.objects.low_stock()
+        context["recent_movements"] = Movement.objects.recent(limit=10)
+        context["recent_projects"] = Project.objects.recent(limit=5)
+        context["recent_activity"] = Movement.get_recent_activity(limit=5)
+        return context
 
 
 class MovementCreateView(CreateView):

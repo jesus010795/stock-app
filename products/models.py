@@ -88,6 +88,25 @@ class ProductQuerySet(models.QuerySet):
 
         return products
 
+    def low_stock(self):
+        """Productos en o por debajo de su stock mínimo.
+
+        Materializa with_stock() y filtra en Python (el stock se calcula
+        por agregación, no es un campo filtrable). Ordenados por
+        severidad: agotados primero, luego los más cercanos a quedarse
+        sin stock. Retorna una lista, igual que with_stock().
+        """
+        products = [
+            product for product in self.with_stock() if product.is_low_stock
+        ]
+        products.sort(
+            key=lambda product: (
+                product.stock_state != "agotado",
+                product.stock_level_pct,
+            )
+        )
+        return products
+
 
 class ProductManager(models.Manager):
     def get_queryset(self):
@@ -101,6 +120,9 @@ class ProductManager(models.Manager):
 
     def with_stock(self):
         return self.get_queryset().with_stock()
+
+    def low_stock(self):
+        return self.get_queryset().low_stock()
 
 
 class Unit(models.Model):
