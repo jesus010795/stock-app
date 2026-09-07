@@ -22,15 +22,27 @@
 {% endblock %}
 
 {% block content %}
-<!-- Toolbar: búsqueda + filtros por categoría y estado (JS de main.js) -->
+<!-- Toolbar: búsqueda server-side + filtros temporales por categoría y estado -->
 <div class="toolbar">
     <div class="toolbar-left">
-        <div class="toolbar-search">
-            <i class="fas fa-search"></i>
-            <input type="text" placeholder="Buscar por nombre o código..."
-                   data-search-target="#tabla-productos tbody tr"
-                   data-empty-target="#productos-empty">
-        </div>
+        <form id="producto-busqueda-form"
+              method="get"
+              action="{% url 'products:products_list' %}"
+              class="toolbar-search">
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input id="producto-busqueda"
+                   type="search"
+                   name="q"
+                   value="{{ search_query }}"
+                   placeholder="Buscar por nombre o código..."
+                   aria-label="Buscar productos por nombre o código"
+                   autocomplete="off">
+        </form>
+        <button type="submit"
+                form="producto-busqueda-form"
+                class="btn btn-secondary btn-sm">
+            Buscar
+        </button>
         <select class="toolbar-select"
                 data-filter-target="#tabla-productos tbody tr"
                 data-filter-attr="data-categoria">
@@ -116,21 +128,22 @@
                 {% endfor %}
             </tbody>
         </table>
-        <div class="empty-state" id="productos-empty" style="display: none;">
-            <i class="fas fa-search"></i>
-            <div class="empty-title">Sin resultados</div>
-            <div class="empty-sub">No se encontraron productos que coincidan con tu búsqueda.</div>
-        </div>
     </div>
     {% if is_paginated %}
     <nav class="pagination" aria-label="Paginación de productos">
         <span>Página {{ page_obj.number }} de {{ paginator.num_pages }}</span>
         <div class="pagination-pages">
             {% if page_obj.has_previous %}
-            <a class="btn btn-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+            <a class="btn btn-secondary btn-sm"
+               href="?page={{ page_obj.previous_page_number }}{% if search_query %}&amp;q={{ search_query|urlencode }}{% endif %}">
+                Anterior
+            </a>
             {% endif %}
             {% if page_obj.has_next %}
-            <a class="btn btn-secondary btn-sm" href="?page={{ page_obj.next_page_number }}">Siguiente</a>
+            <a class="btn btn-secondary btn-sm"
+               href="?page={{ page_obj.next_page_number }}{% if search_query %}&amp;q={{ search_query|urlencode }}{% endif %}">
+                Siguiente
+            </a>
             {% endif %}
         </div>
     </nav>
@@ -138,9 +151,14 @@
 </div>
 {% else %}
 <div class="empty-state">
-    <i class="fas fa-box-open"></i>
+    <i class="fas {% if search_query %}fa-search{% else %}fa-box-open{% endif %}"></i>
+    {% if search_query %}
+    <div class="empty-title">Sin resultados</div>
+    <div class="empty-sub">No se encontraron productos que coincidan con «{{ search_query }}».</div>
+    {% else %}
     <div class="empty-title">No hay productos registrados</div>
     <div class="empty-sub">Agrega tu primer producto para comenzar a gestionar el inventario.</div>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}
