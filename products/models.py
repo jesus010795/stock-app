@@ -69,32 +69,50 @@ class ProductQuerySet(models.QuerySet):
     def with_stock(self):
         """Anexa el stock calculado a cada producto.
 
-        Retorna una lista (no un queryset) porque anexar un atributo
-        calculado requiere materializar los objetos.
+        Mantiene el cálculo en la consulta para que el queryset pueda
+        filtrarse y paginarse antes de materializar los productos.
         """
-        from inventory.models import Movement
+        from django.db.models import Case, DecimalField, F, Sum, Value, When
+        from django.db.models.functions import Coalesce
+        from inventory.models import AdjustmentType, MovementType
 
-        products = list(self)
-        if not products:
-            return products
+        signed_quantity = Case(
+            When(
+                movements__movement_type=MovementType.ENTRY,
+                then=F("movements__quantity"),
+            ),
+            When(
+                movements__movement_type=MovementType.EXIT,
+                then=F("movements__quantity") * -1,
+            ),
+            When(
+                movements__movement_type=MovementType.ADJUSTMENT,
+                movements__adjustment_type=AdjustmentType.IN,
+                then=F("movements__quantity"),
+            ),
+            When(
+                movements__movement_type=MovementType.ADJUSTMENT,
+                movements__adjustment_type=AdjustmentType.OUT,
+                then=F("movements__quantity") * -1,
+            ),
+            default=Value(0),
+            output_field=DecimalField(),
+        )
 
-        stock_map = {
-            r["product__id"]: r["_stock"]
-            for r in Movement.objects.get_products_with_stock()
-        }
-
-        for product in products:
-            product.stock = stock_map.get(product.id, 0)
-
-        return products
+        return self.annotate(
+            stock=Coalesce(
+                Sum(signed_quantity, output_field=DecimalField()),
+                Value(0),
+                output_field=DecimalField(),
+            )
+        ).order_by("sku", "name")
 
     def low_stock(self):
         """Productos en o por debajo de su stock mínimo.
 
-        Materializa with_stock() y filtra en Python (el stock se calcula
-        por agregación, no es un campo filtrable). Ordenados por
+        Materializa with_stock() y filtra en Python para ordenar por
         severidad: agotados primero, luego los más cercanos a quedarse
-        sin stock. Retorna una lista, igual que with_stock().
+        sin stock. Retorna una lista.
         """
         products = [
             product for product in self.with_stock() if product.is_low_stock

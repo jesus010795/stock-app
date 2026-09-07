@@ -49,7 +49,7 @@
             <option value="inactivo">Inactivo</option>
         </select>
     </div>
-    <span class="results-count">{{ products|length }} productos</span>
+    <span class="results-count">{{ paginator.count }} productos</span>
 </div>
 
 {% if products %}
@@ -122,6 +122,19 @@
             <div class="empty-sub">No se encontraron productos que coincidan con tu búsqueda.</div>
         </div>
     </div>
+    {% if is_paginated %}
+    <nav class="pagination" aria-label="Paginación de productos">
+        <span>Página {{ page_obj.number }} de {{ paginator.num_pages }}</span>
+        <div class="pagination-pages">
+            {% if page_obj.has_previous %}
+            <a class="btn btn-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a class="btn btn-secondary btn-sm" href="?page={{ page_obj.next_page_number }}">Siguiente</a>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
 </div>
 {% else %}
 <div class="empty-state">
