@@ -1,5 +1,9 @@
 from django import forms
 
+from employees.models import Employee
+from products.models import Product
+from projects.models import Project
+
 from .models import Movement
 
 
@@ -71,3 +75,22 @@ class MovementForm(forms.ModelForm):
             "warehouse": {"invalid_choice": "El almacén seleccionado no es válido"},
             "project": {"invalid_choice": "El proyecto seleccionado no es válido"},
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["product"].queryset = Product.objects.active().with_stock()
+        self.fields["product"].label_from_instance = self.product_option_label
+        self.fields["product"].empty_label = "Seleccione un producto…"
+        self.fields["employee"].queryset = Employee.objects.filter(
+            is_active=True
+        ).select_related("department")
+        self.fields["employee"].empty_label = "Seleccione un empleado…"
+        self.fields["project"].queryset = Project.objects.active()
+        self.fields["project"].empty_label = "Sin proyecto"
+
+    @staticmethod
+    def product_option_label(product):
+        stock = getattr(product, "stock", None)
+        if stock is None:
+            return str(product)
+        return f"{product} · stock: {stock:g}"
