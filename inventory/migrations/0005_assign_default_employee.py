@@ -14,6 +14,8 @@ def assign_default_employee(apps, schema_editor):
         defaults={"description": "Departamento por defecto para migración"},
     )
     user = User.objects.first()
+    if user is None:
+        user = User.objects.create(username="sistema", is_active=False)
     emp, _ = Employee.objects.get_or_create(
         first_name="Sin",
         last_name="Asignar",
