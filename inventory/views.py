@@ -32,8 +32,9 @@ class MovementCreateView(CreateView):
     def get_initial(self):
         initial = super().get_initial()
         product_id = self.request.GET.get("producto")
-        if product_id and Product.objects.filter(pk=product_id).exists():
-            initial["product"] = product_id
+        if product_id and str(product_id).isdigit():
+            if Product.objects.filter(pk=product_id).exists():
+                initial["product"] = product_id
         return initial
 
     def form_valid(self, form):

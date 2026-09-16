@@ -175,7 +175,7 @@ class Movement(models.Model):
         if not self.quantity or self.quantity <= 0:
             raise ValidationError({"quantity": "La cantidad debe ser mayor a 0"})
 
-        if not self.warehouse and self.product:
+        if not self.warehouse and self.product_id:
             self.warehouse = self.product.warehouse
 
         if not self.employee:
