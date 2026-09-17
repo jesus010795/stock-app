@@ -6,6 +6,8 @@ from .models import Movement
 from .forms import MovementForm
 from django.urls import reverse_lazy
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.http import HttpResponseRedirect
 
 
 # Create your views here.
@@ -39,8 +41,17 @@ class MovementCreateView(CreateView):
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
+        try:
+            self.object = form.save()
+        except ValidationError as e:
+            if hasattr(e, "message_dict"):
+                for field, errors in e.message_dict.items():
+                    form.add_error(field if field in form.fields else None, errors)
+            else:
+                form.add_error(None, e.messages)
+            return self.form_invalid(form)
         messages.success(self.request, "Movimiento registrado correctamente")
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
