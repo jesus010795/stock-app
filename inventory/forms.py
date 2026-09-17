@@ -15,7 +15,6 @@ class MovementForm(forms.ModelForm):
             "movement_type",
             "adjustment_type",
             "quantity",
-            "warehouse",
             "employee",
             "project",
             "reason",
@@ -24,7 +23,6 @@ class MovementForm(forms.ModelForm):
             "product": "Producto",
             "movement_type": "Tipo de movimiento",
             "adjustment_type": "Tipo de ajuste",
-            "warehouse": "Almacén",
             "project": "Proyecto",
             "reason": "Motivo",
         }
@@ -40,7 +38,6 @@ class MovementForm(forms.ModelForm):
                     "inputmode": "decimal",
                 }
             ),
-            "warehouse": forms.Select(attrs={"class": "select"}),
             "employee": forms.Select(attrs={"class": "select"}),
             "project": forms.Select(attrs={"class": "select"}),
             "reason": forms.Textarea(
@@ -72,7 +69,6 @@ class MovementForm(forms.ModelForm):
                 "required": "Debe seleccionar un empleado",
                 "invalid_choice": "El empleado seleccionado no es válido",
             },
-            "warehouse": {"invalid_choice": "El almacén seleccionado no es válido"},
             "project": {"invalid_choice": "El proyecto seleccionado no es válido"},
         }
 
