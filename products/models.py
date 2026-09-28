@@ -24,6 +24,8 @@ class CategoryManager(models.Manager):
 
 
 class Category(models.Model):
+    # agregar slug para la categoria
+    # En el template de productos, filtrar por categoria y mostrar los productos en cada categoria
     name = models.CharField(
         max_length=100, unique=True, verbose_name="Nombre de la Categoría"
     )
@@ -114,9 +116,7 @@ class ProductQuerySet(models.QuerySet):
         severidad: agotados primero, luego los más cercanos a quedarse
         sin stock. Retorna una lista.
         """
-        products = [
-            product for product in self.with_stock() if product.is_low_stock
-        ]
+        products = [product for product in self.with_stock() if product.is_low_stock]
         products.sort(
             key=lambda product: (
                 product.stock_state != "agotado",

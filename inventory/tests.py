@@ -306,3 +306,120 @@ class MovementCreateViewTest(MovementFormTestBase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Stock insuficiente")
+
+
+class MovementModelBaselineTest(MovementFormTestBase):
+    """C0 del plan de refactor: congela el comportamiento actual del modelo.
+
+    Estos tests no se modifican durante C1-C3: si el refactor cambia un
+    número o un comportamiento, fallan solos.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.product_b = Product.objects.create(
+            sku="TST-0100",
+            name="Producto baseline B",
+            category=cls.category,
+            unit=cls.unit,
+            warehouse=cls.warehouse,
+        )
+        cls.product_c = Product.objects.create(
+            sku="TST-0101",
+            name="Producto baseline C",
+            category=cls.category,
+            unit=cls.unit,
+            warehouse=cls.warehouse,
+        )
+        Movement.objects.create(
+            product=cls.product_b,
+            employee=cls.employee,
+            movement_type=MovementType.ENTRY,
+            quantity=Decimal("100"),
+            reason="Carga inicial",
+            created_by=cls.user,
+        )
+        Movement.objects.create(
+            product=cls.product_b,
+            employee=cls.employee,
+            movement_type=MovementType.EXIT,
+            quantity=Decimal("30"),
+            project=cls.project_approved,
+            reason="Consumo de obra",
+            created_by=cls.user,
+        )
+        Movement.objects.create(
+            product=cls.product_b,
+            employee=cls.employee,
+            movement_type=MovementType.ADJUSTMENT,
+            adjustment_type=AdjustmentType.IN,
+            quantity=Decimal("10"),
+            reason="Sobrante de inventario",
+            created_by=cls.user,
+        )
+        Movement.objects.create(
+            product=cls.product_b,
+            employee=cls.employee,
+            movement_type=MovementType.ADJUSTMENT,
+            adjustment_type=AdjustmentType.OUT,
+            quantity=Decimal("5"),
+            reason="Merma",
+            created_by=cls.user,
+        )
+
+    def test_get_stock_for_product_exact_number(self):
+        self.assertEqual(
+            Movement.get_stock_for_product(self.product_b), Decimal("75")
+        )
+        self.assertEqual(Movement.get_stock_for_product(self.product), Decimal("100"))
+        self.assertEqual(Movement.get_stock_for_product(self.product_c), 0)
+
+    def test_get_products_with_stock_rows(self):
+        rows = {
+            row["product__id"]: row["_stock"]
+            for row in Movement.objects.get_products_with_stock()
+        }
+        self.assertEqual(rows[self.product_b.pk], Decimal("75"))
+        self.assertEqual(rows[self.product.pk], Decimal("100"))
+        self.assertNotIn(self.product_c.pk, rows)
+
+    def test_with_product_stock_current_behavior(self):
+        """Documenta el comportamiento actual (C0): cada fila queda anotada con
+        su propia cantidad firmada, no con el stock del producto (GROUP BY por
+        fila). C3 lo reescribe; este test se actualiza ahí con intencionalidad.
+        """
+        movements = Movement.objects.for_product(self.product_b).with_product_stock()
+        for movement in movements:
+            with self.subTest(movimiento=movement.pk):
+                self.assertEqual(movement._stock, movement.signed_quantity)
+
+    def test_signed_quantity_all_types(self):
+        movements = {
+            (m.movement_type, m.adjustment_type): m.signed_quantity
+            for m in Movement.objects.for_product(self.product_b)
+        }
+        self.assertEqual(movements[(MovementType.ENTRY, None)], Decimal("100"))
+        self.assertEqual(movements[(MovementType.EXIT, None)], Decimal("-30"))
+        self.assertEqual(movements[(MovementType.ADJUSTMENT, AdjustmentType.IN)], Decimal("10"))
+        self.assertEqual(
+            movements[(MovementType.ADJUSTMENT, AdjustmentType.OUT)], Decimal("-5")
+        )
+
+    def test_get_recent_activity_structure(self):
+        events = Movement.get_recent_activity(limit=10)
+        self.assertEqual(len(events), 10)
+        for event in events:
+            with self.subTest(evento=event["actor"]):
+                self.assertEqual(
+                    set(event.keys()),
+                    {"icon", "fa", "actor", "action", "target", "created_at"},
+                )
+                self.assertIn(event["icon"], {"danger", "success", "info", "purple"})
+        acciones = [event["action"] for event in events]
+        self.assertTrue(any("registró" in action for action in acciones))
+        self.assertTrue(any("fue creado en el sistema" in action for action in acciones))
+        self.assertTrue(any("fue agregado al área de" in action for action in acciones))
+        fechas = [event["created_at"] for event in events]
+        self.assertEqual(fechas, sorted(fechas, reverse=True))
+        self.assertEqual(len(Movement.get_recent_activity(limit=3)), 3)
