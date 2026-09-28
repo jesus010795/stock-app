@@ -1,5 +1,6 @@
 from django.db import models
-from django.db.models import Sum, Q
+from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
+from django.db.models.functions import Coalesce
 from django.core.exceptions import ValidationError
 from products.models import Product
 from projects.models import Project, ProjectStatus
@@ -40,37 +41,35 @@ class MovementQuerySet(models.QuerySet):
         Precarga producto (con unidad), empleado, proyecto y almacén
         para las tarjetas del dashboard y las fichas de detalle.
         """
-        return (
-            self.select_related("product__unit", "employee", "project", "warehouse")
-            .order_by("-created_at")[:limit]
-        )
+        return self.select_related(
+            "product__unit", "employee", "project", "warehouse"
+        ).order_by("-created_at")[:limit]
 
     def with_product_stock(self):
-        from django.db.models import Case, When, Value, F, DecimalField
-        from django.db.models.functions import Coalesce
-
         return self.annotate(
             _stock=Coalesce(
                 Sum(
                     Case(
-                        When(movement_type=MovementType.ENTRY, then=F('quantity')),
-                        When(movement_type=MovementType.EXIT, then=F('quantity') * -1),
-                        When(movement_type=MovementType.ADJUSTMENT, adjustment_type=AdjustmentType.IN, then=F('quantity')),
-                        When(movement_type=MovementType.ADJUSTMENT, adjustment_type=AdjustmentType.OUT, then=F('quantity') * -1),
+                        When(movement_type=MovementType.ENTRY, then=F("quantity")),
+                        When(movement_type=MovementType.EXIT, then=F("quantity") * -1),
+                        When(
+                            movement_type=MovementType.ADJUSTMENT,
+                            adjustment_type=AdjustmentType.IN,
+                            then=F("quantity"),
+                        ),
+                        When(
+                            movement_type=MovementType.ADJUSTMENT,
+                            adjustment_type=AdjustmentType.OUT,
+                            then=F("quantity") * -1,
+                        ),
                         default=Value(0),
-                        output_field=DecimalField()
+                        output_field=DecimalField(),
                     )
                 ),
                 Value(0),
-                output_field=DecimalField()
+                output_field=DecimalField(),
             )
         )
-
-    def by_product(self, product):
-        return self.filter(product=product)
-
-    def by_project(self, project):
-        return self.filter(project=project)
 
 
 class MovementManager(models.Manager):
@@ -99,25 +98,36 @@ class MovementManager(models.Manager):
         return self.get_queryset().with_product_stock()
 
     def get_products_with_stock(self):
-        from django.db.models import Case, When, Value, F, DecimalField
-        from django.db.models.functions import Coalesce
-
-        return self.values('product').annotate(
-            _stock=Coalesce(
-                Sum(
-                    Case(
-                        When(movement_type=MovementType.ENTRY, then=F('quantity')),
-                        When(movement_type=MovementType.EXIT, then=F('quantity') * -1),
-                        When(movement_type=MovementType.ADJUSTMENT, adjustment_type=AdjustmentType.IN, then=F('quantity')),
-                        When(movement_type=MovementType.ADJUSTMENT, adjustment_type=AdjustmentType.OUT, then=F('quantity') * -1),
-                        default=Value(0),
-                        output_field=DecimalField()
-                    )
-                ),
-                Value(0),
-                output_field=DecimalField()
+        return (
+            self.values("product")
+            .annotate(
+                _stock=Coalesce(
+                    Sum(
+                        Case(
+                            When(movement_type=MovementType.ENTRY, then=F("quantity")),
+                            When(
+                                movement_type=MovementType.EXIT, then=F("quantity") * -1
+                            ),
+                            When(
+                                movement_type=MovementType.ADJUSTMENT,
+                                adjustment_type=AdjustmentType.IN,
+                                then=F("quantity"),
+                            ),
+                            When(
+                                movement_type=MovementType.ADJUSTMENT,
+                                adjustment_type=AdjustmentType.OUT,
+                                then=F("quantity") * -1,
+                            ),
+                            default=Value(0),
+                            output_field=DecimalField(),
+                        )
+                    ),
+                    Value(0),
+                    output_field=DecimalField(),
+                )
             )
-        ).values('product__id', 'product__sku', 'product__name', '_stock')
+            .values("product__id", "product__sku", "product__name", "_stock")
+        )
 
 
 class Movement(models.Model):
@@ -179,9 +189,7 @@ class Movement(models.Model):
             self.warehouse = self.product.warehouse
 
         if not self.employee:
-            raise ValidationError(
-                {"employee": "Debe seleccionar un empleado"}
-            )
+            raise ValidationError({"employee": "Debe seleccionar un empleado"})
 
         if self.movement_type == MovementType.EXIT:
             if not self.project and not self.reason:
@@ -190,7 +198,9 @@ class Movement(models.Model):
                 )
             if self.project and self.project.status != ProjectStatus.APPROVED:
                 raise ValidationError(
-                    {"project": "Solo se puede sacar material para proyectos en curso (Aprobados)"}
+                    {
+                        "project": "Solo se puede sacar material para proyectos en curso (Aprobados)"
+                    }
                 )
 
         if self.movement_type == MovementType.ENTRY:
@@ -312,37 +322,53 @@ class Movement(models.Model):
             elif movement.movement_type == MovementType.ENTRY:
                 icon, fa, action = "success", "fa-arrow-down", "registró una entrada de"
             elif movement.adjustment_type == AdjustmentType.IN:
-                icon, fa, action = "info", "fa-arrow-up", "registró un ajuste de aumento de"
+                icon, fa, action = (
+                    "info",
+                    "fa-arrow-up",
+                    "registró un ajuste de aumento de",
+                )
             else:
-                icon, fa, action = "info", "fa-arrow-down", "registró un ajuste de disminución de"
-            events.append({
-                "icon": icon,
-                "fa": fa,
-                "actor": movement.employee.full_name if movement.employee else "Sistema",
-                "action": action,
-                "target": movement.product.name,
-                "created_at": movement.created_at,
-            })
+                icon, fa, action = (
+                    "info",
+                    "fa-arrow-down",
+                    "registró un ajuste de disminución de",
+                )
+            events.append(
+                {
+                    "icon": icon,
+                    "fa": fa,
+                    "actor": (
+                        movement.employee.full_name if movement.employee else "Sistema"
+                    ),
+                    "action": action,
+                    "target": movement.product.name,
+                    "created_at": movement.created_at,
+                }
+            )
 
         for project in Project.objects.recent(limit=limit):
-            events.append({
-                "icon": "purple",
-                "fa": "fa-project-diagram",
-                "actor": project.name,
-                "action": "fue creado en el sistema",
-                "target": None,
-                "created_at": project.created_at,
-            })
+            events.append(
+                {
+                    "icon": "purple",
+                    "fa": "fa-project-diagram",
+                    "actor": project.name,
+                    "action": "fue creado en el sistema",
+                    "target": None,
+                    "created_at": project.created_at,
+                }
+            )
 
         for employee in Employee.objects.order_by("-created_at")[:limit]:
-            events.append({
-                "icon": "info",
-                "fa": "fa-user-plus",
-                "actor": employee.full_name,
-                "action": "fue agregado al área de",
-                "target": employee.department.name,
-                "created_at": employee.created_at,
-            })
+            events.append(
+                {
+                    "icon": "info",
+                    "fa": "fa-user-plus",
+                    "actor": employee.full_name,
+                    "action": "fue agregado al área de",
+                    "target": employee.department.name,
+                    "created_at": employee.created_at,
+                }
+            )
 
         events.sort(key=lambda event: event["created_at"], reverse=True)
         return events[:limit]
