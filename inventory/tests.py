@@ -368,6 +368,15 @@ class MovementModelBaselineTest(MovementFormTestBase):
             created_by=cls.user,
         )
 
+    def test_manager_exposes_queryset_methods(self):
+        self.assertTrue(Movement.objects.for_product(self.product_b).exists())
+        self.assertTrue(Movement.objects.entries().exists())
+        self.assertTrue(Movement.objects.exits().exists())
+        self.assertTrue(Movement.objects.adjustments().exists())
+        list(Movement.objects.recent(limit=2))
+        list(Movement.objects.with_product_stock())
+        list(Movement.objects.get_products_with_stock())
+
     def test_get_stock_for_product_exact_number(self):
         self.assertEqual(
             Movement.get_stock_for_product(self.product_b), Decimal("75")

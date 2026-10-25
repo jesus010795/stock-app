@@ -71,32 +71,6 @@ class MovementQuerySet(models.QuerySet):
             )
         )
 
-
-class MovementManager(models.Manager):
-    def get_queryset(self):
-        return MovementQuerySet(self.model, using=self._db)
-
-    def for_product(self, product):
-        return self.get_queryset().for_product(product)
-
-    def for_project(self, project):
-        return self.get_queryset().for_project(project)
-
-    def entries(self):
-        return self.get_queryset().entries()
-
-    def exits(self):
-        return self.get_queryset().exits()
-
-    def adjustments(self):
-        return self.get_queryset().adjustments()
-
-    def recent(self, limit=10):
-        return self.get_queryset().recent(limit)
-
-    def with_product_stock(self):
-        return self.get_queryset().with_product_stock()
-
     def get_products_with_stock(self):
         return (
             self.values("product")
@@ -128,8 +102,6 @@ class MovementManager(models.Manager):
             )
             .values("product__id", "product__sku", "product__name", "_stock")
         )
-
-
 class Movement(models.Model):
     product = models.ForeignKey(
         Product, on_delete=models.PROTECT, related_name="movements"
@@ -177,7 +149,7 @@ class Movement(models.Model):
             models.Index(fields=["product", "movement_type"]),
         ]
 
-    objects = MovementManager()
+    objects = MovementQuerySet.as_manager()
 
     def clean(self):
         super().clean()
