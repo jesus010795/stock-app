@@ -6,7 +6,7 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 
 - Use the local venv: `venv/bin/python manage.py <cmd>` (activate `venv/bin/activate`). Django is installed only there — do not `pip install` globally.
 - Run server: `venv/bin/python manage.py runserver`
-- Run tests: `venv/bin/python manage.py test inventory` (26 tests: MovementForm + MovementCreateView). Other apps' `tests.py` are still empty stubs.
+- Run tests: `venv/bin/python manage.py test inventory products` (38 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock). `projects`, `employees`, and `warehouses` tests are still empty stubs.
 - `manage.py check` passes clean.
 
 ## Movement form (completed 09-2026; plan: docs/plan_completar_movementform.md)
@@ -17,7 +17,7 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 ## Architecture
 
 - 5 apps: `products` (Category/Unit/Product), `projects` (Project), `inventory` (Movement), `warehouses` (Warehouse), `employees` (Department/Employee).
-- **`Movement` is the single source of truth for stock.** Stock is always computed by aggregation (`Movement.get_stock_for_product`, `MovementQuerySet.with_product_stock`) — never stored on Product. Keep it that way; don't reintroduce a `current_stock` field.
+- **`Movement` is the single source of truth for stock.** Stock is always computed by aggregation (`Movement.get_stock_for_product`, `MovementQuerySet.stock`, `MovementQuerySet.stock_by_product`, `ProductQuerySet.with_stock`) — never stored on Product. The formula lives only in `signed_quantity_expression()` and `stock_expression()` (`inventory/models.py`); `products` reuses it with the `movements__` prefix through a deferred import to avoid the `products` ↔ `inventory` cycle. Keep it that way; don't reintroduce a `current_stock` field.
 - Business rules live in `inventory/models.py` `Movement.clean()`/`save()` (~lines 172–231): quantity > 0, no-negative stock on EXIT/AJUST-OUT, EXIT requires APPROVED project or `reason`, warehouse inherited from `product.warehouse`, employee required. `Movement` has no delete permission in admin.
 - All FKs to parent records use `on_delete=PROTECT`; deletes are custom-protected across apps.
 

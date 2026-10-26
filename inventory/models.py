@@ -1,11 +1,11 @@
-from django.db import models
-from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
-from django.db.models.functions import Coalesce
 from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Case, DecimalField, F, Sum, Value, When
+from django.db.models.functions import Coalesce
+from employees.models import Employee
 from products.models import Product
 from projects.models import Project, ProjectStatus
 from warehouses.models import Warehouse
-from employees.models import Employee
 
 
 class MovementType(models.TextChoices):
@@ -17,6 +17,44 @@ class MovementType(models.TextChoices):
 class AdjustmentType(models.TextChoices):
     IN = "IN", "Aumento"
     OUT = "OUT", "Disminución"
+
+
+def signed_quantity_expression(prefix=""):
+    quantity = F(f"{prefix}quantity")
+    movement_type = f"{prefix}movement_type"
+    adjustment_type = f"{prefix}adjustment_type"
+
+    return Case(
+        When(**{movement_type: MovementType.ENTRY}, then=quantity),
+        When(**{movement_type: MovementType.EXIT}, then=quantity * -1),
+        When(
+            **{
+                movement_type: MovementType.ADJUSTMENT,
+                adjustment_type: AdjustmentType.IN,
+            },
+            then=quantity,
+        ),
+        When(
+            **{
+                movement_type: MovementType.ADJUSTMENT,
+                adjustment_type: AdjustmentType.OUT,
+            },
+            then=quantity * -1,
+        ),
+        default=Value(0),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+
+
+def stock_expression(prefix=""):
+    return Coalesce(
+        Sum(
+            signed_quantity_expression(prefix),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        ),
+        Value(0),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
 
 
 class MovementQuerySet(models.QuerySet):
@@ -45,63 +83,21 @@ class MovementQuerySet(models.QuerySet):
             "product__unit", "employee", "project", "warehouse"
         ).order_by("-created_at")[:limit]
 
-    def with_product_stock(self):
-        return self.annotate(
-            _stock=Coalesce(
-                Sum(
-                    Case(
-                        When(movement_type=MovementType.ENTRY, then=F("quantity")),
-                        When(movement_type=MovementType.EXIT, then=F("quantity") * -1),
-                        When(
-                            movement_type=MovementType.ADJUSTMENT,
-                            adjustment_type=AdjustmentType.IN,
-                            then=F("quantity"),
-                        ),
-                        When(
-                            movement_type=MovementType.ADJUSTMENT,
-                            adjustment_type=AdjustmentType.OUT,
-                            then=F("quantity") * -1,
-                        ),
-                        default=Value(0),
-                        output_field=DecimalField(),
-                    )
-                ),
-                Value(0),
-                output_field=DecimalField(),
-            )
-        )
+    def with_signed_quantity(self):
+        return self.annotate(_signed_quantity=signed_quantity_expression())
+
+    def stock(self):
+        return self.aggregate(_stock=stock_expression())["_stock"]
+
+    def stock_by_product(self):
+        return self.values("product").annotate(_stock=stock_expression())
 
     def get_products_with_stock(self):
-        return (
-            self.values("product")
-            .annotate(
-                _stock=Coalesce(
-                    Sum(
-                        Case(
-                            When(movement_type=MovementType.ENTRY, then=F("quantity")),
-                            When(
-                                movement_type=MovementType.EXIT, then=F("quantity") * -1
-                            ),
-                            When(
-                                movement_type=MovementType.ADJUSTMENT,
-                                adjustment_type=AdjustmentType.IN,
-                                then=F("quantity"),
-                            ),
-                            When(
-                                movement_type=MovementType.ADJUSTMENT,
-                                adjustment_type=AdjustmentType.OUT,
-                                then=F("quantity") * -1,
-                            ),
-                            default=Value(0),
-                            output_field=DecimalField(),
-                        )
-                    ),
-                    Value(0),
-                    output_field=DecimalField(),
-                )
-            )
-            .values("product__id", "product__sku", "product__name", "_stock")
+        return self.stock_by_product().values(
+            "product__id", "product__sku", "product__name", "_stock"
         )
+
+
 class Movement(models.Model):
     product = models.ForeignKey(
         Product, on_delete=models.PROTECT, related_name="movements"
@@ -214,39 +210,7 @@ class Movement(models.Model):
 
     @classmethod
     def get_stock_for_product(cls, product):
-        result = cls.objects.filter(product=product).aggregate(
-            entries=Sum(
-                "quantity",
-                output_field=models.DecimalField(),
-                filter=Q(movement_type=MovementType.ENTRY),
-            ),
-            exits=Sum(
-                "quantity",
-                output_field=models.DecimalField(),
-                filter=Q(movement_type=MovementType.EXIT),
-            ),
-            adjustments_in=Sum(
-                "quantity",
-                output_field=models.DecimalField(),
-                filter=Q(
-                    movement_type=MovementType.ADJUSTMENT,
-                    adjustment_type=AdjustmentType.IN,
-                ),
-            ),
-            adjustments_out=Sum(
-                "quantity",
-                output_field=models.DecimalField(),
-                filter=Q(
-                    movement_type=MovementType.ADJUSTMENT,
-                    adjustment_type=AdjustmentType.OUT,
-                ),
-            ),
-        )
-        entries = result["entries"] or 0
-        exits = result["exits"] or 0
-        adjustments_in = result["adjustments_in"] or 0
-        adjustments_out = result["adjustments_out"] or 0
-        return entries + adjustments_in - exits - adjustments_out
+        return cls.objects.for_product(product).stock()
 
     @classmethod
     def get_project_consumption(cls, project):

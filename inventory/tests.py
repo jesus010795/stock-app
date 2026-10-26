@@ -374,7 +374,11 @@ class MovementModelBaselineTest(MovementFormTestBase):
         self.assertTrue(Movement.objects.exits().exists())
         self.assertTrue(Movement.objects.adjustments().exists())
         list(Movement.objects.recent(limit=2))
-        list(Movement.objects.with_product_stock())
+        list(Movement.objects.for_product(self.product_b).with_signed_quantity())
+        self.assertEqual(
+            Movement.objects.for_product(self.product_b).stock(), Decimal("75")
+        )
+        list(Movement.objects.stock_by_product())
         list(Movement.objects.get_products_with_stock())
 
     def test_get_stock_for_product_exact_number(self):
@@ -393,15 +397,56 @@ class MovementModelBaselineTest(MovementFormTestBase):
         self.assertEqual(rows[self.product.pk], Decimal("100"))
         self.assertNotIn(self.product_c.pk, rows)
 
-    def test_with_product_stock_current_behavior(self):
-        """Documenta el comportamiento actual (C0): cada fila queda anotada con
-        su propia cantidad firmada, no con el stock del producto (GROUP BY por
-        fila). C3 lo reescribe; este test se actualiza ahí con intencionalidad.
-        """
-        movements = Movement.objects.for_product(self.product_b).with_product_stock()
+    def test_signed_quantity_expression_matches_model_property(self):
+        movements = Movement.objects.for_product(
+            self.product_b
+        ).with_signed_quantity()
+
         for movement in movements:
-            with self.subTest(movimiento=movement.pk):
-                self.assertEqual(movement._stock, movement.signed_quantity)
+            with self.subTest(movement=movement.pk):
+                self.assertEqual(movement._signed_quantity, movement.signed_quantity)
+
+    def test_stock_by_product_groups_by_product(self):
+        rows = {
+            row["product"]: row["_stock"]
+            for row in Movement.objects.stock_by_product()
+        }
+
+        self.assertEqual(rows[self.product_b.pk], Decimal("75"))
+        self.assertEqual(rows[self.product.pk], Decimal("100"))
+        self.assertNotIn(self.product_c.pk, rows)
+
+    def test_all_stock_entry_points_return_the_same_value(self):
+        grouped_stock = next(
+            row["_stock"]
+            for row in Movement.objects.stock_by_product()
+            if row["product"] == self.product_b.pk
+        )
+        product_stock = Product.objects.with_stock().get(pk=self.product_b.pk).stock
+
+        self.assertEqual(Movement.get_stock_for_product(self.product_b), Decimal("75"))
+        self.assertEqual(
+            Movement.objects.for_product(self.product_b).stock(), Decimal("75")
+        )
+        self.assertEqual(grouped_stock, Decimal("75"))
+        self.assertEqual(product_stock, Decimal("75"))
+
+    def test_stock_is_zero_without_movements(self):
+        self.assertEqual(
+            Movement.objects.for_product(self.product_c).stock(), Decimal("0")
+        )
+
+    def test_stock_is_independent_of_movement_order(self):
+        newest_movement = (
+            Movement.objects.for_product(self.product_b)
+            .order_by("-created_at")
+            .first()
+        )
+
+        self.assertEqual(newest_movement.movement_type, MovementType.ADJUSTMENT)
+        self.assertEqual(
+            Movement.objects.for_product(self.product_b).stock(), Decimal("75")
+        )
 
     def test_signed_quantity_all_types(self):
         movements = {

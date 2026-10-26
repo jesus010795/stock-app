@@ -74,39 +74,10 @@ class ProductQuerySet(models.QuerySet):
         Mantiene el cálculo en la consulta para que el queryset pueda
         filtrarse y paginarse antes de materializar los productos.
         """
-        from django.db.models import Case, DecimalField, F, Sum, Value, When
-        from django.db.models.functions import Coalesce
-        from inventory.models import AdjustmentType, MovementType
-
-        signed_quantity = Case(
-            When(
-                movements__movement_type=MovementType.ENTRY,
-                then=F("movements__quantity"),
-            ),
-            When(
-                movements__movement_type=MovementType.EXIT,
-                then=F("movements__quantity") * -1,
-            ),
-            When(
-                movements__movement_type=MovementType.ADJUSTMENT,
-                movements__adjustment_type=AdjustmentType.IN,
-                then=F("movements__quantity"),
-            ),
-            When(
-                movements__movement_type=MovementType.ADJUSTMENT,
-                movements__adjustment_type=AdjustmentType.OUT,
-                then=F("movements__quantity") * -1,
-            ),
-            default=Value(0),
-            output_field=DecimalField(),
-        )
+        from inventory.models import stock_expression
 
         return self.annotate(
-            stock=Coalesce(
-                Sum(signed_quantity, output_field=DecimalField()),
-                Value(0),
-                output_field=DecimalField(),
-            )
+            stock=stock_expression("movements__")
         ).order_by("sku", "name")
 
     def low_stock(self):
