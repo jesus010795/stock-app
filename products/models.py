@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.db.models import ProtectedError
+from django.db.models import Case, F, FloatField, ProtectedError, Q, Value, When
+from django.db.models.functions import Cast, Least, Round
 from warehouses.models import Warehouse
 
 
@@ -73,28 +74,46 @@ class ProductQuerySet(models.QuerySet):
 
         Mantiene el cálculo en la consulta para que el queryset pueda
         filtrarse y paginarse antes de materializar los productos.
+        Precarga categoría, unidad y almacén para evitar N+1 al pintar
+        las tarjetas de stock del dashboard y del listado de productos.
         """
         from inventory.models import stock_expression
 
-        return self.annotate(
+        return self.select_related("category", "unit", "warehouse").annotate(
             stock=stock_expression("movements__")
         ).order_by("sku", "name")
 
     def low_stock(self):
         """Productos en o por debajo de su stock mínimo.
 
-        Materializa with_stock() y filtra en Python para ordenar por
-        severidad: agotados primero, luego los más cercanos a quedarse
-        sin stock. Retorna una lista.
+        El filtro y el orden por severidad se resuelven en SQL: primero
+        los agotados y luego los más cercanos a quedarse sin stock.
+        Retorna una lista.
         """
-        products = [product for product in self.with_stock() if product.is_low_stock]
-        products.sort(
-            key=lambda product: (
-                product.stock_state != "agotado",
-                product.stock_level_pct,
-            )
+        severity = Case(
+            When(Q(is_active=True) & Q(stock__lte=0), then=Value(0)),
+            default=Value(1),
         )
-        return products
+        stock_level = Case(
+            When(Q(stock__lte=0), then=Value(0.0)),
+            When(Q(minimum_stock__lte=0), then=Value(100.0)),
+            default=Least(
+                Value(100.0),
+                Round(
+                    Cast(F("stock") * 100, FloatField())
+                    / (Cast(F("minimum_stock") * 2, FloatField())),
+                    0,
+                ),
+            ),
+        )
+
+        return list(
+            self.with_stock()
+            .filter(minimum_stock__isnull=False, minimum_stock__gte=0)
+            .filter(stock__lte=F("minimum_stock"))
+            .annotate(_severity=severity, _stock_level=stock_level)
+            .order_by("_severity", "_stock_level", "sku", "name")
+        )
 
 
 class ProductManager(models.Manager):
