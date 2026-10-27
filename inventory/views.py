@@ -4,6 +4,7 @@ from products.models import Product
 from projects.models import Project
 from .models import Movement
 from .forms import MovementForm
+from .selectors import recent_activity
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -19,7 +20,7 @@ class HomeView(TemplateView):
         context["low_stock_products"] = Product.objects.low_stock()
         context["recent_movements"] = Movement.objects.recent(limit=10)
         context["recent_projects"] = Project.objects.recent(limit=5)
-        context["recent_activity"] = Movement.get_recent_activity(limit=5)
+        context["recent_activity"] = recent_activity(limit=5)
         return context
 
 

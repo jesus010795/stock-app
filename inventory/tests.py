@@ -8,6 +8,7 @@ from django.urls import reverse
 from employees.models import Department, Employee
 from inventory.forms import MovementForm
 from inventory.models import AdjustmentType, Movement, MovementType
+from inventory.selectors import recent_activity
 from products.models import Category, Product, Unit
 from projects.models import Project, ProjectStatus
 from warehouses.models import Warehouse
@@ -460,8 +461,8 @@ class MovementModelBaselineTest(MovementFormTestBase):
             movements[(MovementType.ADJUSTMENT, AdjustmentType.OUT)], Decimal("-5")
         )
 
-    def test_get_recent_activity_structure(self):
-        events = Movement.get_recent_activity(limit=10)
+    def test_recent_activity_structure(self):
+        events = recent_activity(limit=10)
         self.assertEqual(len(events), 10)
         for event in events:
             with self.subTest(evento=event["actor"]):
@@ -476,4 +477,73 @@ class MovementModelBaselineTest(MovementFormTestBase):
         self.assertTrue(any("fue agregado al área de" in action for action in acciones))
         fechas = [event["created_at"] for event in events]
         self.assertEqual(fechas, sorted(fechas, reverse=True))
-        self.assertEqual(len(Movement.get_recent_activity(limit=3)), 3)
+        self.assertEqual(len(recent_activity(limit=3)), 3)
+
+
+class RecentActivitySelectorTest(MovementFormTestBase):
+    def test_recent_activity_uses_three_queries(self):
+        with self.assertNumQueries(3):
+            recent_activity(limit=5)
+
+    def test_recent_activity_maps_all_movement_types(self):
+        Movement.objects.create(
+            product=self.product,
+            employee=self.employee,
+            movement_type=MovementType.EXIT,
+            quantity=Decimal("10"),
+            project=self.project_approved,
+            reason="Consumo de prueba",
+            created_by=self.user,
+        )
+        Movement.objects.create(
+            product=self.product,
+            employee=self.employee,
+            movement_type=MovementType.ADJUSTMENT,
+            adjustment_type=AdjustmentType.IN,
+            quantity=Decimal("5"),
+            reason="Ajuste de prueba",
+            created_by=self.user,
+        )
+        Movement.objects.create(
+            product=self.product,
+            employee=self.employee,
+            movement_type=MovementType.ADJUSTMENT,
+            adjustment_type=AdjustmentType.OUT,
+            quantity=Decimal("2"),
+            reason="Ajuste de prueba",
+            created_by=self.user,
+        )
+
+        events = recent_activity(limit=10)
+        movement_events = {
+            event["action"]: event
+            for event in events
+            if event["target"] == self.product.name
+        }
+        expected = {
+            "registró una entrada de": ("success", "fa-arrow-down"),
+            "registró una salida de": ("danger", "fa-arrow-up"),
+            "registró un ajuste de aumento de": ("info", "fa-arrow-up"),
+            "registró un ajuste de disminución de": ("info", "fa-arrow-down"),
+        }
+
+        for action, (icon, icon_class) in expected.items():
+            with self.subTest(action=action):
+                self.assertEqual(movement_events[action]["icon"], icon)
+                self.assertEqual(movement_events[action]["fa"], icon_class)
+
+    def test_recent_activity_includes_inactive_employees(self):
+        actors = {event["actor"] for event in recent_activity(limit=10)}
+
+        self.assertIn("Ana Pérez", actors)
+        self.assertIn("Luis López", actors)
+
+    def test_dashboard_renders_recent_activity(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["recent_activity"])
+        self.assertContains(response, "Ana Pérez")
+
+    def test_recent_activity_is_not_exposed_by_the_model(self):
+        self.assertFalse(hasattr(Movement, "get_recent_activity"))
