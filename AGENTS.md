@@ -6,7 +6,7 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 
 - Use the local venv: `venv/bin/python manage.py <cmd>` (activate `venv/bin/activate`). Django is installed only there — do not `pip install` globally.
 - Run server: `venv/bin/python manage.py runserver`
-- Run tests: `venv/bin/python manage.py test inventory products` (48 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock + Recent activity selector + Low stock queryset). `projects`, `employees`, and `warehouses` tests are still empty stubs.
+- Run tests: `venv/bin/python manage.py test inventory products` (55 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock + Recent activity selector + Low stock queryset + Dashboard low stock block). `projects`, `employees`, and `warehouses` tests are still empty stubs.
 - `manage.py check` passes clean.
 
 ## Movement form (completed 09-2026; plan: docs/plan_completar_movementform.md)
@@ -19,7 +19,8 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 - 5 apps: `products` (Category/Unit/Product), `projects` (Project), `inventory` (Movement), `warehouses` (Warehouse), `employees` (Department/Employee).
 - **`Movement` is the single source of truth for stock.** Stock is always computed by aggregation (`Movement.get_stock_for_product`, `MovementQuerySet.stock`, `MovementQuerySet.stock_by_product`, `ProductQuerySet.with_stock`) — never stored on Product. The formula lives only in `signed_quantity_expression()` and `stock_expression()` (`inventory/models.py`); `products` reuses it with the `movements__` prefix through a deferred import to avoid the `products` ↔ `inventory` cycle. Keep it that way; don't reintroduce a `current_stock` field.
 - The dashboard activity feed lives in `inventory/selectors.py` (`recent_activity()`), not in `Movement`; it combines movements, projects, and employees for the view and uses `select_related("department")` to avoid the Employee.department N+1.
-- `ProductQuerySet.low_stock()` filters and orders by severity in SQL (exhausted first, then by stock level) instead of filtering and sorting in Python; `with_stock()` preloads `category`/`unit`/`warehouse` to avoid N+1. The dashboard went from 12 to 6 queries with identical output.
+- `ProductQuerySet.low_stock()` filters and orders by severity in SQL (exhausted first, then by stock level) and returns a **lazy queryset**; `with_stock()` preloads `category`/`unit`/`warehouse` to avoid N+1. The dashboard went from 12 to 6 queries with identical output.
+- The dashboard low-stock card asks for the total (`count()` on the unsliced queryset) and the top-6 (`list(qs[:LOW_STOCK_DISPLAY_LIMIT])`) separately; the limit lives only in `inventory/views.py` (`LOW_STOCK_DISPLAY_LIMIT = 6`) and the template receives `low_stock_count` + a materialized `low_stock_products` list (no `|length`/`|slice` on querysets). The block is 2 queries but transfers 6 rows instead of the full set.
 - Business rules live in `inventory/models.py` `Movement.clean()`/`save()` (~lines 172–231): quantity > 0, no-negative stock on EXIT/AJUST-OUT, EXIT requires APPROVED project or `reason`, warehouse inherited from `product.warehouse`, employee required. `Movement` has no delete permission in admin.
 - All FKs to parent records use `on_delete=PROTECT`; deletes are custom-protected across apps.
 

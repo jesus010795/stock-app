@@ -39,12 +39,12 @@
             <div class="card-header-title">
                 <i class="fas fa-exclamation-triangle"></i> Alertas de Stock Bajo
             </div>
-            <span class="badge badge-warning">{{ low_stock_products|length }} productos</span>
+            <span class="badge badge-warning">{{ low_stock_count }} productos</span>
         </div>
         <div class="card-body tight">
             {% if low_stock_products %}
             <div class="alert-list">
-                {% for product in low_stock_products|slice:":6" %}
+                {% for product in low_stock_products %}
                 <div class="alert-item">
                     {% if product.stock_state == "agotado" %}
                     <div class="alert-icon critical"><i class="fas fa-exclamation-triangle"></i></div>

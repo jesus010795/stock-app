@@ -189,9 +189,13 @@ class LowStockQuerySetTest(TestCase):
             [product.sku for product in expected],
         )
 
-    def test_low_stock_uses_a_single_query(self):
-        with self.assertNumQueries(1):
+    def test_low_stock_is_lazy(self):
+        with self.assertNumQueries(0):
             Product.objects.low_stock()
+
+    def test_low_stock_uses_a_single_query_when_materialized(self):
+        with self.assertNumQueries(1):
+            list(Product.objects.low_stock())
 
     def test_low_stock_does_not_trigger_unit_n_plus_one(self):
         with self.assertNumQueries(1):

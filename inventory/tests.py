@@ -9,6 +9,7 @@ from employees.models import Department, Employee
 from inventory.forms import MovementForm
 from inventory.models import AdjustmentType, Movement, MovementType
 from inventory.selectors import recent_activity
+from inventory.views import LOW_STOCK_DISPLAY_LIMIT
 from products.models import Category, Product, Unit
 from projects.models import Project, ProjectStatus
 from warehouses.models import Warehouse
@@ -547,3 +548,93 @@ class RecentActivitySelectorTest(MovementFormTestBase):
 
     def test_recent_activity_is_not_exposed_by_the_model(self):
         self.assertFalse(hasattr(Movement, "get_recent_activity"))
+
+
+class DashboardLowStockTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="dashboard-tester", password="test1234"
+        )
+        cls.warehouse = Warehouse.objects.create(code="DSH-1", name="Almacén dashboard")
+        cls.category = Category.objects.create(name="Dashboard low stock")
+        cls.unit = Unit.objects.create(name="Cajas", abbreviation="c")
+        cls.department = Department.objects.create(name="Dashboard department")
+        cls.employee = Employee.objects.create(
+            first_name="Dash",
+            last_name="Board",
+            department=cls.department,
+            created_by=cls.user,
+        )
+        cls.low_products = [
+            Product.objects.create(
+                sku=f"ALR-{i:04d}",
+                name=f"Producto alerta {i:02d}",
+                category=cls.category,
+                unit=cls.unit,
+                warehouse=cls.warehouse,
+                minimum_stock=Decimal("10"),
+            )
+            for i in range(1, 9)
+        ]
+        cls.healthy = Product.objects.create(
+            sku="SAN-0001",
+            name="Producto con stock sano",
+            category=cls.category,
+            unit=cls.unit,
+            warehouse=cls.warehouse,
+            minimum_stock=Decimal("10"),
+        )
+        Movement.objects.create(
+            product=cls.healthy,
+            employee=cls.employee,
+            movement_type=MovementType.ENTRY,
+            quantity=Decimal("50"),
+            reason="Carga inicial",
+            created_by=cls.user,
+        )
+
+    def test_dashboard_reports_the_total_low_stock_count(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["low_stock_count"], 8)
+
+    def test_dashboard_limits_the_displayed_low_stock_products(self):
+        response = self.client.get(reverse("home"))
+
+        products = response.context["low_stock_products"]
+        self.assertEqual(len(products), LOW_STOCK_DISPLAY_LIMIT)
+        self.assertEqual(
+            [product.sku for product in products],
+            [f"ALR-{i:04d}" for i in range(1, 7)],
+        )
+
+    def test_low_stock_count_and_slice_use_two_queries(self):
+        qs = Product.objects.low_stock()
+
+        with self.assertNumQueries(2):
+            total = qs.count()
+            products = list(qs[:LOW_STOCK_DISPLAY_LIMIT])
+
+        self.assertEqual(total, 8)
+        self.assertEqual(len(products), LOW_STOCK_DISPLAY_LIMIT)
+
+    def test_dashboard_uses_seven_queries(self):
+        # 2 del bloque de stock bajo (COUNT + LIMIT 6) + 1 movimientos
+        # + 1 proyectos + 3 del feed de actividad = 7. Cliente anónimo
+        # para que session/auth no añadan consultas de middleware.
+        with self.assertNumQueries(7):
+            self.client.get(reverse("home"))
+
+    def test_dashboard_renders_the_total_in_the_badge(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, "8 productos")
+
+    def test_dashboard_renders_only_six_alerts(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, "Producto alerta 01")
+        self.assertContains(response, "Producto alerta 06")
+        self.assertNotContains(response, "Producto alerta 07")

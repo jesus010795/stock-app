@@ -12,12 +12,17 @@ from django.http import HttpResponseRedirect
 
 
 # Create your views here.
+LOW_STOCK_DISPLAY_LIMIT = 6
+
+
 class HomeView(TemplateView):
     template_name = "inventory/home.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["low_stock_products"] = Product.objects.low_stock()
+        low_stock = Product.objects.low_stock()
+        context["low_stock_count"] = low_stock.count()
+        context["low_stock_products"] = list(low_stock[:LOW_STOCK_DISPLAY_LIMIT])
         context["recent_movements"] = Movement.objects.recent(limit=10)
         context["recent_projects"] = Project.objects.recent(limit=5)
         context["recent_activity"] = recent_activity(limit=5)

@@ -88,7 +88,9 @@ class ProductQuerySet(models.QuerySet):
 
         El filtro y el orden por severidad se resuelven en SQL: primero
         los agotados y luego los más cercanos a quedarse sin stock.
-        Retorna una lista.
+        Retorna un queryset lazy: cada consumidor decide cuánto toma
+        (por ejemplo, `count()` para el total y `list(qs[:6])` para
+        las tarjetas del dashboard).
         """
         severity = Case(
             When(Q(is_active=True) & Q(stock__lte=0), then=Value(0)),
@@ -107,7 +109,7 @@ class ProductQuerySet(models.QuerySet):
             ),
         )
 
-        return list(
+        return (
             self.with_stock()
             .filter(minimum_stock__isnull=False, minimum_stock__gte=0)
             .filter(stock__lte=F("minimum_stock"))
