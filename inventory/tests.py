@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -9,6 +10,7 @@ from employees.models import Department, Employee
 from inventory.forms import MovementForm
 from inventory.models import AdjustmentType, Movement, MovementType
 from inventory.selectors import recent_activity
+from inventory.services import register_movement
 from inventory.views import LOW_STOCK_DISPLAY_LIMIT
 from products.models import Category, Product, Unit
 from projects.models import Project, ProjectStatus
@@ -638,3 +640,76 @@ class DashboardLowStockTest(TestCase):
         self.assertContains(response, "Producto alerta 01")
         self.assertContains(response, "Producto alerta 06")
         self.assertNotContains(response, "Producto alerta 07")
+
+
+class RegisterMovementServiceTest(MovementFormTestBase):
+    def test_creates_movement_and_returns_the_instance(self):
+        movement = register_movement(
+            product=self.product,
+            employee=self.employee,
+            movement_type=MovementType.ENTRY,
+            quantity=Decimal("10"),
+            reason="Compra de reposición",
+            created_by=self.user,
+        )
+
+        self.assertIsInstance(movement, Movement)
+        self.assertTrue(Movement.objects.filter(pk=movement.pk).exists())
+        self.assertEqual(movement.created_by, self.user)
+        self.assertEqual(movement.warehouse, self.product.warehouse)
+
+    def test_movement_changes_stock_through_the_same_rule(self):
+        register_movement(
+            product=self.product,
+            employee=self.employee,
+            movement_type=MovementType.EXIT,
+            quantity=Decimal("5"),
+            project=self.project_approved,
+            created_by=self.user,
+        )
+
+        self.assertEqual(Movement.get_stock_for_product(self.product), Decimal("95"))
+
+    def test_insufficient_stock_raises_and_persists_nothing(self):
+        movements_before = Movement.objects.count()
+
+        with self.assertRaises(ValidationError) as ctx:
+            register_movement(
+                product=self.product,
+                employee=self.employee,
+                movement_type=MovementType.EXIT,
+                quantity=Decimal("500"),
+                project=self.project_approved,
+                created_by=self.user,
+            )
+
+        self.assertIn("Stock insuficiente", ctx.exception.messages[0])
+        self.assertEqual(Movement.objects.count(), movements_before)
+
+    def test_exit_without_project_or_reason_raises_and_persists_nothing(self):
+        movements_before = Movement.objects.count()
+
+        with self.assertRaises(ValidationError):
+            register_movement(
+                product=self.product,
+                employee=self.employee,
+                movement_type=MovementType.EXIT,
+                quantity=Decimal("5"),
+                created_by=self.user,
+            )
+
+        self.assertEqual(Movement.objects.count(), movements_before)
+
+    def test_adjustment_requires_type_and_reason(self):
+        movements_before = Movement.objects.count()
+
+        with self.assertRaises(ValidationError):
+            register_movement(
+                product=self.product,
+                employee=self.employee,
+                movement_type=MovementType.ADJUSTMENT,
+                quantity=Decimal("5"),
+                created_by=self.user,
+            )
+
+        self.assertEqual(Movement.objects.count(), movements_before)

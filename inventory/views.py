@@ -5,6 +5,7 @@ from projects.models import Project
 from .models import Movement
 from .forms import MovementForm
 from .selectors import recent_activity
+from .services import register_movement
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -46,9 +47,17 @@ class MovementCreateView(CreateView):
         return initial
 
     def form_valid(self, form):
-        form.instance.created_by = self.request.user
         try:
-            self.object = form.save()
+            self.object = register_movement(
+                product=form.cleaned_data["product"],
+                employee=form.cleaned_data["employee"],
+                movement_type=form.cleaned_data["movement_type"],
+                quantity=form.cleaned_data["quantity"],
+                project=form.cleaned_data.get("project"),
+                reason=form.cleaned_data.get("reason") or "",
+                adjustment_type=form.cleaned_data.get("adjustment_type"),
+                created_by=self.request.user,
+            )
         except ValidationError as e:
             if hasattr(e, "message_dict"):
                 for field, errors in e.message_dict.items():

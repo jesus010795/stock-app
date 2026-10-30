@@ -6,7 +6,7 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 
 - Use the local venv: `venv/bin/python manage.py <cmd>` (activate `venv/bin/activate`). Django is installed only there — do not `pip install` globally.
 - Run server: `venv/bin/python manage.py runserver`
-- Run tests: `venv/bin/python manage.py test inventory products` (55 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock + Recent activity selector + Low stock queryset + Dashboard low stock block). `projects`, `employees`, and `warehouses` tests are still empty stubs.
+- Run tests: `venv/bin/python manage.py test inventory products` (60 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock + Recent activity selector + Low stock queryset + Dashboard low stock block + Movement service). `projects`, `employees`, and `warehouses` tests are still empty stubs.
 - `manage.py check` passes clean.
 
 ## Movement form (completed 09-2026; plan: docs/plan_completar_movementform.md)
@@ -22,12 +22,13 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 - `ProductQuerySet.low_stock()` filters and orders by severity in SQL (exhausted first, then by stock level) and returns a **lazy queryset**; `with_stock()` preloads `category`/`unit`/`warehouse` to avoid N+1. The dashboard went from 12 to 6 queries with identical output.
 - The dashboard low-stock card asks for the total (`count()` on the unsliced queryset) and the top-6 (`list(qs[:LOW_STOCK_DISPLAY_LIMIT])`) separately; the limit lives only in `inventory/views.py` (`LOW_STOCK_DISPLAY_LIMIT = 6`) and the template receives `low_stock_count` + a materialized `low_stock_products` list (no `|length`/`|slice` on querysets). The block is 2 queries but transfers 6 rows instead of the full set.
 - Business rules live in `inventory/models.py` `Movement.clean()`/`save()` (~lines 172–231): quantity > 0, no-negative stock on EXIT/AJUST-OUT, EXIT requires APPROVED project or `reason`, warehouse inherited from `product.warehouse`, employee required. `Movement` has no delete permission in admin.
+- Movement writes go through `register_movement()` (`inventory/services.py`), wrapped in `transaction.atomic()`: it coordinates the use case, it does NOT re-validate. Row rules and the stock rule stay in `Movement.clean()`/`save()` so the admin write path (`save_model` → `save()`) remains protected too. `MovementCreateView.form_valid` calls the service and re-injects `ValidationError`s into the form.
 - All FKs to parent records use `on_delete=PROTECT`; deletes are custom-protected across apps.
 
 ## Conventions & gotchas
 
 - All user-facing text is **Spanish** (model `verbose_name`, admin, templates, error messages, docs). Keep new strings in Spanish.
-- Docs are authoritative but **gitignored**: `docs/README.md` (spec, model tables, business rules), `docs/resumen_*.md` (change logs). `commits.txt` (also gitignored) records intended commit history and may drift from `git log`.
+- Docs are authoritative but **gitignored**: `docs/README.md` (spec, model tables, business rules), `docs/resumen_*.md` (change logs). `commits.txt` (also gitignored) records intended commit history and may drift from `git log`. Every new block in `commits.txt` MUST start with its commit number (`commit N (...)`); derive N from `git log --oneline | wc -l` + 1 and mark entries as executed once they appear in `git log`.
 - `db.sqlite3` and `media/` are gitignored (local only); migrations are tracked. A fresh clone needs `migrate`.
 - Frontend: plain Django templates in `templates/` (`base.html` = sidebar + topbar + content; `inventory/home.html` is the single view) + hand-written CSS in `static/css/` (`base.css`, `main.css`, `components.css`, `dashboard.css`). No JS framework.
 - `Employee` has NO `.active()` queryset method (unlike `Product`/`Project`) — use `filter(is_active=True)`, and `select_related("department")` in any option queryset (`Employee.__str__` touches `department.name` → N+1 otherwise).
