@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Case, DecimalField, F, Sum, Value, When
+from django.db.models import Case, DecimalField, F, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
 from employees.models import Employee
 from products.models import Product
@@ -143,6 +143,31 @@ class Movement(models.Model):
             models.Index(fields=["movement_type"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["product", "movement_type"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(quantity__gt=0),
+                name="movement_quantity_positive",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (
+                        Q(movement_type=MovementType.ADJUSTMENT)
+                        & ~Q(adjustment_type__isnull=True)
+                        & Q(
+                            adjustment_type__in=[
+                                AdjustmentType.IN,
+                                AdjustmentType.OUT,
+                            ]
+                        )
+                    )
+                    | (
+                        ~Q(movement_type=MovementType.ADJUSTMENT)
+                        & Q(adjustment_type__isnull=True)
+                    )
+                ),
+                name="movement_adjustment_type_coherent",
+            ),
         ]
 
     objects = MovementQuerySet.as_manager()

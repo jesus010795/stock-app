@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -713,3 +714,86 @@ class RegisterMovementServiceTest(MovementFormTestBase):
             )
 
         self.assertEqual(Movement.objects.count(), movements_before)
+
+
+class MovementConstraintsTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="constraint-tester", password="test1234"
+        )
+        cls.warehouse = Warehouse.objects.create(code="CON-1", name="Almacén constraints")
+        cls.category = Category.objects.create(name="Constraints")
+        cls.unit = Unit.objects.create(name="Unidades C", abbreviation="uc")
+        cls.department = Department.objects.create(name="Constraints department")
+        cls.employee = Employee.objects.create(
+            first_name="Con",
+            last_name="Straint",
+            department=cls.department,
+            created_by=cls.user,
+        )
+        cls.product = Product.objects.create(
+            sku="CON-0001",
+            name="Producto constraints",
+            category=cls.category,
+            unit=cls.unit,
+            warehouse=cls.warehouse,
+        )
+
+    def movement(self, **overrides):
+        data = {
+            "product": self.product,
+            "employee": self.employee,
+            "movement_type": MovementType.ENTRY,
+            "quantity": Decimal("10"),
+            "reason": "Prueba de constraints",
+            "created_by": self.user,
+        }
+        data.update(overrides)
+        return Movement(**data)
+
+    def test_bulk_create_rejects_zero_and_negative_quantity(self):
+        for quantity in (Decimal("0"), Decimal("-5")):
+            with self.subTest(quantity=quantity):
+                with self.assertRaises(IntegrityError):
+                    # bulk_create envuelve su INSERT en atomic(savepoint=False):
+                    # al fallar deja la transacción rota; este savepoint
+                    # externo la restaura para el siguiente subTest.
+                    with transaction.atomic():
+                        Movement.objects.bulk_create(
+                            [self.movement(quantity=quantity)]
+                        )
+
+    def test_bulk_create_accepts_valid_rows(self):
+        Movement.objects.bulk_create([self.movement()])
+
+        self.assertEqual(Movement.objects.count(), 1)
+
+    def test_full_clean_reports_quantity_violation(self):
+        with self.assertRaises(ValidationError):
+            self.movement(quantity=Decimal("0")).full_clean()
+
+    def test_bulk_create_rejects_adjustment_without_type(self):
+        movement = self.movement(
+            movement_type=MovementType.ADJUSTMENT,
+            reason="Ajuste de prueba",
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Movement.objects.bulk_create([movement])
+
+    def test_bulk_create_rejects_non_adjustment_with_type(self):
+        for adjustment_type in (AdjustmentType.IN, "XX"):
+            with self.subTest(adjustment_type=adjustment_type):
+                movement = self.movement(adjustment_type=adjustment_type)
+                with self.assertRaises(IntegrityError):
+                    with transaction.atomic():
+                        Movement.objects.bulk_create([movement])
+
+    def test_validate_constraints_reports_adjustment_incoherence(self):
+        movement = self.movement(
+            movement_type=MovementType.ADJUSTMENT,
+            reason="Ajuste de prueba",
+        )
+        with self.assertRaises(ValidationError):
+            movement.validate_constraints()
