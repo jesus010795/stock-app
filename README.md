@@ -57,8 +57,8 @@ Requisitos: Python 3.10+ y Git.
 
 ```bash
 # 1. Clonar
-git clone https://github.com/TU_USUARIO/TU_REPOSITORIO.git
-cd TU_REPOSITORIO
+git clone https://github.com/jesus010795/stock-app.git
+cd stock-app
 
 # 2. Entorno virtual e instalación de Django (aún no hay requirements.txt)
 python3 -m venv venv
