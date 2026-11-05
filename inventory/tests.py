@@ -797,3 +797,17 @@ class MovementConstraintsTest(TestCase):
         )
         with self.assertRaises(ValidationError):
             movement.validate_constraints()
+
+
+class MovementIndexesTest(TestCase):
+    def test_movement_meta_indexes_match_the_measured_set(self):
+        names = {index.name for index in Movement._meta.indexes}
+
+        self.assertEqual(
+            names,
+            {
+                "inventory_m_movemen_6d66c7_idx",
+                "inventory_m_created_b65c6f_idx",
+                "inventory_m_product_501a9d_idx",
+            },
+        )

@@ -6,7 +6,7 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 
 - Use the local venv: `venv/bin/python manage.py <cmd>` (activate `venv/bin/activate`). Django is installed only there — do not `pip install` globally.
 - Run server: `venv/bin/python manage.py runserver`
-- Run tests: `venv/bin/python manage.py test inventory products` (66 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock + Recent activity selector + Low stock queryset + Dashboard low stock block + Movement service + Movement constraints). `projects`, `employees`, and `warehouses` tests are still empty stubs.
+- Run tests: `venv/bin/python manage.py test inventory products` (67 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock + Recent activity selector + Low stock queryset + Dashboard low stock block + Movement service + Movement constraints + Movement indexes). `projects`, `employees`, and `warehouses` tests are still empty stubs.
 - `manage.py check` passes clean.
 
 ## Movement form (completed 09-2026; plan: docs/plan_completar_movementform.md)

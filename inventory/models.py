@@ -138,8 +138,6 @@ class Movement(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["product"]),
-            models.Index(fields=["project"]),
             models.Index(fields=["movement_type"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["product", "movement_type"]),
