@@ -140,7 +140,6 @@ class Movement(models.Model):
         indexes = [
             models.Index(fields=["movement_type"]),
             models.Index(fields=["created_at"]),
-            models.Index(fields=["product", "movement_type"]),
         ]
         constraints = [
             models.CheckConstraint(

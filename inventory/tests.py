@@ -808,6 +808,5 @@ class MovementIndexesTest(TestCase):
             {
                 "inventory_m_movemen_6d66c7_idx",
                 "inventory_m_created_b65c6f_idx",
-                "inventory_m_product_501a9d_idx",
             },
         )
