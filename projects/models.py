@@ -82,7 +82,6 @@ class Project(models.Model):
         ordering = ['code']
         indexes = [
             models.Index(fields=["status"]),
-            models.Index(fields=["code"]),
         ]
 
     def __str__(self):

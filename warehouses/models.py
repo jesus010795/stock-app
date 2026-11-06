@@ -53,7 +53,6 @@ class Warehouse(models.Model):
     class Meta:
         ordering = ["code"]
         indexes = [
-            models.Index(fields=["code"]),
             models.Index(fields=["warehouse_type"]),
             models.Index(fields=["is_active"]),
         ]

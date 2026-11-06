@@ -41,7 +41,6 @@ class Category(models.Model):
         verbose_name_plural = "Categorías"
         ordering = ["name"]
         indexes = [
-            models.Index(fields=["name"]),
             models.Index(fields=["is_active"]),
         ]
 
@@ -148,7 +147,6 @@ class Unit(models.Model):
         verbose_name_plural = "Unidades"
         ordering = ["name"]
         indexes = [
-            models.Index(fields=["name"]),
             models.Index(fields=["is_active"]),
         ]
 
@@ -262,8 +260,6 @@ class Product(models.Model):
     class Meta:
         ordering = ["sku", "name"]
         indexes = [
-            models.Index(fields=["sku"]),
-            models.Index(fields=["category"]),
             models.Index(fields=["is_active"]),
         ]
 
