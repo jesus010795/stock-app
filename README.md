@@ -2,7 +2,7 @@
 
 Aplicación web desarrollada con **Python y Django** para administrar productos, controlar existencias y registrar movimientos de inventario, con seguimiento del consumo de materiales por proyecto.
 
-> **Estado:** En desarrollo activo. Proyecto personal de aprendizaje y mejora continua.
+> **Estado:** En desarrollo activo. Proyecto personal de aprendizaje y mejora continua. Pasó por una refactorización incremental del dominio de inventario: reorganización por capas, integridad a nivel de base de datos y optimización de consultas, con paridad de comportamiento verificada en cada paso (ver historial de commits).
 
 ## Funcionalidades
 
@@ -48,7 +48,7 @@ Aplicación web desarrollada con **Python y Django** para administrar productos,
 - Python 3.10
 - Django 5.2
 - Django ORM (QuerySets, agregaciones, constraints)
-- SQLite (base de datos de desarrollo)
+- PostgreSQL 14 (base de datos principal) con SQLite como fallback de desarrollo
 - Plantillas Django + CSS propio
 
 ## Instalación local
@@ -60,10 +60,10 @@ Requisitos: Python 3.10+ y Git.
 git clone https://github.com/jesus010795/stock-app.git
 cd stock-app
 
-# 2. Entorno virtual e instalación de Django (aún no hay requirements.txt)
+# 2. Entorno virtual e instalación de dependencias
 python3 -m venv venv
 source venv/bin/activate
-pip install Django==5.2
+pip install -r requirements.txt
 
 # 3. Migraciones
 python manage.py migrate
@@ -77,11 +77,16 @@ python manage.py runserver
 
 Abre `http://127.0.0.1:8000/`.
 
-Configuración sensible: `SECRET_KEY` se lee de la variable de entorno `DJANGO_SECRET_KEY` (con un fallback de desarrollo). Para un entorno distinto al local:
+### Base de datos
+
+Sin configuración adicional se usa **SQLite** (`db.sqlite3`, ideal para un clon rápido). Para usar **PostgreSQL** (motor principal de desarrollo):
 
 ```bash
-export DJANGO_SECRET_KEY="tu-clave-secreta"
+export POSTGRES_DB=stockapp POSTGRES_USER=stockapp POSTGRES_PASSWORD=stockapp
+python manage.py migrate
 ```
+
+La conexión usa `localhost:5432` por defecto (`POSTGRES_HOST`/`POSTGRES_PORT` opcionales). `SECRET_KEY` se lee de la variable de entorno `DJANGO_SECRET_KEY` (con un fallback de desarrollo).
 
 > `db.sqlite3`, `media/`, `docs/` y `commits.txt` están en `.gitignore`: este repositorio es el código, no los datos locales ni la bitácora de trabajo.
 
@@ -107,8 +112,8 @@ python manage.py test inventory products
 
 - [ ] Autenticación y control de acceso en las vistas públicas (hoy el dashboard y el formulario no requieren login).
 - [ ] Historial y detalle de movimientos (rutas ya esbozadas).
-- [ ] Evaluar migración a PostgreSQL como fase separada.
-- [ ] `requirements.txt` y capturas de pantalla.
+- [ ] Parte 3 de concurrencia: `select_for_update()` sobre el producto para cerrar la carrera de lectura-validación-escritura en PostgreSQL.
+- [ ] Migración del admin al service `register_movement` (AP-11).
 
 ## Autor
 

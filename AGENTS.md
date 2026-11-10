@@ -1,12 +1,13 @@
 # AGENTS.md
 
-Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory manager. No REST API, no Docker, no CI, no requirements.txt.
+Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory manager. No REST API, no Docker, no CI. `requirements.txt` = Django + psycopg.
 
 ## Commands
 
 - Use the local venv: `venv/bin/python manage.py <cmd>` (activate `venv/bin/activate`). Django is installed only there — do not `pip install` globally.
 - Run server: `venv/bin/python manage.py runserver`
 - Run tests: `venv/bin/python manage.py test inventory products` (67 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock + Recent activity selector + Low stock queryset + Dashboard low stock block + Movement service + Movement constraints + Movement indexes). `projects`, `employees`, and `warehouses` tests are still empty stubs.
+- Database: PostgreSQL by default in this machine (`POSTGRES_DB=stockapp POSTGRES_USER=stockapp POSTGRES_PASSWORD=stockapp`); without `POSTGRES_DB`, SQLite `db.sqlite3` is the dev fallback. Both engines run the same 67 tests green.
 - `manage.py check` passes clean.
 
 ## Movement form (completed 09-2026; plan: docs/plan_completar_movementform.md)
@@ -30,7 +31,9 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 ## Conventions & gotchas
 
 - All user-facing text is **Spanish** (model `verbose_name`, admin, templates, error messages, docs). Keep new strings in Spanish.
-- Docs are authoritative but **gitignored**: `docs/README.md` (spec, model tables, business rules), `docs/resumen_*.md` (change logs). `commits.txt` (also gitignored) records intended commit history and may drift from `git log`. Every new block in `commits.txt` MUST start with its commit number (`commit N (...)`); derive N from `git log --oneline | wc -l` + 1 and mark entries as executed once they appear in `git log`.
+- Docs are authoritative but **gitignored**: `docs/rev01/` (análisis y planes históricos, resúmenes), `docs/rev02/` (guía de arquitectura, análisis, notas técnicas y cierre del refactor de inventario; prefijos `NN_` por orden cronológico). `commits.txt` (also gitignored) records intended commit history and may drift from `git log`. Every new block in `commits.txt` MUST start with its commit number (`commit N (...)`); derive N from `git log --oneline | wc -l` + 1 and mark entries as executed once they appear in `git log`.
+- The inventory refactor is **closed** (commits 35–51): incremental reorganization by layers (models → QuerySet/Service/Selector), single source of truth for the stock calculation, DB integrity hardening (`CheckConstraint`s) and performance optimization (dashboard queries and indexes). Final state and lessons in `docs/rev02/07_estado_final_plan_c0_c8_05_11_2026.md` and `docs/rev02/08_resumen_cierre_c0_c8_05_11_2026.md`. Pending: parte 3 (replanned for PostgreSQL; see below), login/permisos, historial de movimientos, admin → service (AP-11).
+- PostgreSQL migration **done** (2026-11-05; see `docs/rev02/10_migracion_postgresql_05_11_2026.md`): PostgreSQL 14 local is the main dev DB via env vars; SQLite remains the fallback. Parte 3 is now replanned for PostgreSQL (`select_for_update()` on the product row instead of IMMEDIATE).
 - `db.sqlite3` and `media/` are gitignored (local only); migrations are tracked. A fresh clone needs `migrate`.
 - Frontend: plain Django templates in `templates/` (`base.html` = sidebar + topbar + content; `inventory/home.html` is the single view) + hand-written CSS in `static/css/` (`base.css`, `main.css`, `components.css`, `dashboard.css`). No JS framework.
 - `Employee` has NO `.active()` queryset method (unlike `Product`/`Project`) — use `filter(is_active=True)`, and `select_related("department")` in any option queryset (`Employee.__str__` touches `department.name` → N+1 otherwise).
