@@ -1,4 +1,5 @@
 from django.db import transaction
+from products.models import Product
 
 from .models import Movement
 
@@ -22,6 +23,12 @@ def register_movement(
     Movement.clean()/save() (fuente única, también protege al admin).
     """
     with transaction.atomic():
+        # Bloquea la fila del producto hasta el COMMIT: serializa a los
+        # escritores de un mismo producto y hace que la validación de
+        # stock de save() lea el estado ya actualizado (evita la carrera
+        # de lectura-validación-escritura en PostgreSQL). En SQLite
+        # select_for_update() es un no-op y se pierde la protección.
+        product = Product.objects.select_for_update().get(pk=product.pk)
         movement = Movement(
             product=product,
             employee=employee,

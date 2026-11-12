@@ -1,10 +1,12 @@
 from decimal import Decimal
 
+import threading
+
 from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.urls import reverse
 
 from employees.models import Department, Employee
@@ -809,4 +811,79 @@ class MovementIndexesTest(TestCase):
                 "inventory_m_movemen_6d66c7_idx",
                 "inventory_m_created_b65c6f_idx",
             },
+        )
+
+
+@skipUnlessDBFeature("has_select_for_update")
+class ConcurrentRegisterMovementTest(TransactionTestCase):
+    """Dos salidas simultáneas no pueden dejar el stock en negativo.
+
+    TransactionTestCase (commits reales) porque TestCase envuelve todo
+    en transacciones: cada hilo abriría su propia conexión y no vería
+    los datos no confirmados del otro, ocultando la carrera.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="concurrent-tester", password="test1234"
+        )
+        self.warehouse = Warehouse.objects.create(code="CONC-1", name="Almacén concurrencia")
+        self.category = Category.objects.create(name="Concurrencia")
+        self.unit = Unit.objects.create(name="Piezas C", abbreviation="pc")
+        self.department = Department.objects.create(name="Departamento concurrencia")
+        self.employee = Employee.objects.create(
+            first_name="Con",
+            last_name="Current",
+            department=self.department,
+            created_by=self.user,
+        )
+        self.product = Product.objects.create(
+            sku="CONC-0001",
+            name="Producto concurrencia",
+            category=self.category,
+            unit=self.unit,
+            warehouse=self.warehouse,
+        )
+        Movement.objects.create(
+            product=self.product,
+            employee=self.employee,
+            movement_type=MovementType.ENTRY,
+            quantity=Decimal("100"),
+            reason="Carga inicial",
+            created_by=self.user,
+        )
+
+    def test_two_concurrent_exits_serialize_on_the_product(self):
+        barrier = threading.Barrier(2)
+        results = []
+
+        def worker():
+            from django.db import connection
+
+            try:
+                barrier.wait(timeout=10)
+                register_movement(
+                    product=self.product,
+                    employee=self.employee,
+                    movement_type=MovementType.EXIT,
+                    quantity=Decimal("80"),
+                    reason="Salida concurrente",
+                    created_by=self.user,
+                )
+                results.append("ok")
+            except ValidationError:
+                results.append("stock-insuficiente")
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+
+        self.assertEqual(sorted(results), ["ok", "stock-insuficiente"])
+        self.assertEqual(Movement.get_stock_for_product(self.product), Decimal("20"))
+        self.assertEqual(
+            Movement.objects.filter(movement_type=MovementType.EXIT).count(), 1
         )
