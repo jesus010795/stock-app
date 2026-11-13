@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 import threading
@@ -7,6 +8,7 @@ from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
+from django.utils import timezone
 from django.urls import reverse
 
 from employees.models import Department, Employee
@@ -282,7 +284,7 @@ class MovementCreateViewTest(MovementFormTestBase):
 
     def test_creates_exit_movement_with_audit_fields(self):
         response = self.client.post(self.url(), self.form_data())
-        self.assertRedirects(response, self.url())
+        self.assertRedirects(response, reverse("inventory:historial"))
         movement = Movement.objects.filter(movement_type=MovementType.EXIT).get()
         self.assertEqual(movement.quantity, Decimal("5"))
         self.assertEqual(movement.project, self.project_approved)
@@ -301,7 +303,7 @@ class MovementCreateViewTest(MovementFormTestBase):
                 quantity="20",
             ),
         )
-        self.assertRedirects(response, self.url())
+        self.assertRedirects(response, reverse("inventory:historial"))
         movement = Movement.objects.get(reason="Compra de reposición")
         self.assertEqual(movement.warehouse, self.product.warehouse)
 
@@ -887,3 +889,109 @@ class ConcurrentRegisterMovementTest(TransactionTestCase):
         self.assertEqual(
             Movement.objects.filter(movement_type=MovementType.EXIT).count(), 1
         )
+
+
+class MovementHistoryTest(MovementFormTestBase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for i in range(25):
+            Movement.objects.create(
+                product=cls.product,
+                employee=cls.employee,
+                movement_type=MovementType.ENTRY,
+                quantity=Decimal("10"),
+                reason=f"Carga histórica {i}",
+                created_by=cls.user,
+            )
+        for i in range(3):
+            Movement.objects.create(
+                product=cls.product,
+                employee=cls.employee,
+                movement_type=MovementType.EXIT,
+                quantity=Decimal("2"),
+                project=cls.project_approved,
+                created_by=cls.user,
+            )
+
+    def test_history_renders_and_paginates(self):
+        response = self.client.get(reverse("inventory:historial"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["movements"]), 20)
+        self.assertEqual(response.context["paginator"].count, 29)
+        self.assertEqual(response.context["paginator"].num_pages, 2)
+
+    def test_history_orders_newest_first(self):
+        response = self.client.get(reverse("inventory:historial"))
+
+        newest = Movement.objects.order_by("-created_at").first()
+        self.assertEqual(response.context["movements"][0].pk, newest.pk)
+
+    def test_history_filters_by_type(self):
+        response = self.client.get(
+            reverse("inventory:historial"), {"movement_type": MovementType.EXIT}
+        )
+
+        movements = response.context["movements"]
+        self.assertEqual(response.context["paginator"].count, 3)
+        self.assertTrue(
+            all(m.movement_type == MovementType.EXIT for m in movements)
+        )
+
+    def test_history_search_matches_sku_and_name(self):
+        response = self.client.get(
+            reverse("inventory:historial"), {"q": self.product.sku}
+        )
+
+        self.assertEqual(response.context["paginator"].count, 29)
+        self.assertTrue(
+            all(m.product == self.product for m in response.context["movements"])
+        )
+
+    def test_history_filters_by_date_range(self):
+        Movement.objects.filter(reason="Carga histórica 0").update(
+            created_at=timezone.now() - timedelta(days=30)
+        )
+        today = timezone.localdate()
+
+        response = self.client.get(
+            reverse("inventory:historial"), {"desde": today.isoformat()}
+        )
+        self.assertEqual(response.context["paginator"].count, 28)
+
+        response = self.client.get(
+            reverse("inventory:historial"),
+            {"hasta": (today - timedelta(days=1)).isoformat()},
+        )
+        self.assertEqual(response.context["paginator"].count, 1)
+
+    def test_history_uses_select_related(self):
+        with self.assertNumQueries(2):
+            self.client.get(reverse("inventory:historial"))
+
+    def test_history_renders_empty_state(self):
+        response = self.client.get(
+            reverse("inventory:historial"), {"q": "no-existe-zzz"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sin resultados")
+
+    def test_detail_renders_all_fields(self):
+        movement = Movement.objects.filter(
+            movement_type=MovementType.EXIT
+        ).first()
+
+        response = self.client.get(reverse("inventory:detalle", args=[movement.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, movement.product.name)
+        self.assertContains(response, movement.product.sku)
+        self.assertContains(response, "Salida")
+        self.assertContains(response, movement.employee.full_name)
+
+    def test_detail_404_for_unknown_pk(self):
+        response = self.client.get(reverse("inventory:detalle", args=[99999]))
+
+        self.assertEqual(response.status_code, 404)

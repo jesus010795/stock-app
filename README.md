@@ -105,6 +105,7 @@ python manage.py test inventory products
 | `/` | Dashboard |
 | `/productos/lista/` | Listado de productos |
 | `/proyectos/lista/` y `/proyectos/detalle/<pk>/` | Proyectos |
+| `/movimientos/` y `/movimientos/<pk>/` | Historial y detalle de movimientos |
 | `/movimientos/nuevo/` | Alta de movimiento |
 | `/admin/` | Administración de Django |
 

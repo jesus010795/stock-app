@@ -1,15 +1,18 @@
-from django.shortcuts import render
-from django.views.generic import CreateView, TemplateView
-from products.models import Product
-from projects.models import Project
-from .models import Movement
-from .forms import MovementForm
-from .selectors import recent_activity
-from .services import register_movement
-from django.urls import reverse_lazy
+from datetime import datetime, time, timedelta
+
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.http import HttpResponseRedirect
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, DetailView, ListView, TemplateView
+from products.models import Product
+from projects.models import Project
+
+from .forms import MovementFilterForm, MovementForm
+from .models import Movement
+from .selectors import recent_activity
+from .services import register_movement
 
 
 # Create your views here.
@@ -30,13 +33,74 @@ class HomeView(TemplateView):
         return context
 
 
+class MovementListView(ListView):
+    model = Movement
+    template_name = "inventory/movimiento_list.html"
+    context_object_name = "movements"
+    paginate_by = 20
+
+    def get_queryset(self):
+        queryset = Movement.objects.select_related(
+            "product__unit", "employee", "project", "warehouse"
+        )
+        form = MovementFilterForm(self.request.GET)
+        if form.is_valid():
+            movement_type = form.cleaned_data["movement_type"]
+            if movement_type:
+                queryset = queryset.filter(movement_type=movement_type)
+
+            query = form.cleaned_data["q"]
+            if query:
+                queryset = queryset.filter(
+                    Q(product__sku__icontains=query)
+                    | Q(product__name__icontains=query)
+                )
+
+            # Límites de fecha como datetimes (no __date) para evitar
+            # la dependencia de la zona horaria de la conexión.
+            desde = form.cleaned_data["desde"]
+            if desde:
+                queryset = queryset.filter(
+                    created_at__gte=datetime.combine(desde, time.min)
+                )
+            hasta = form.cleaned_data["hasta"]
+            if hasta:
+                queryset = queryset.filter(
+                    created_at__lt=datetime.combine(hasta, time.min)
+                    + timedelta(days=1)
+                )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["filter_form"] = MovementFilterForm(self.request.GET)
+        context["breadcrumb_title"] = "Movimientos"
+        context["breadcrumb_subtitle"] = "Historial de entradas, salidas y ajustes"
+        return context
+
+
+class MovementDetailView(DetailView):
+    model = Movement
+    template_name = "inventory/movimiento_detail.html"
+    context_object_name = "movement"
+
+    def get_queryset(self):
+        return Movement.objects.select_related(
+            "product__unit", "employee__department", "project", "warehouse", "created_by"
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["breadcrumb_title"] = "Movimientos"
+        context["breadcrumb_subtitle"] = "Detalle del movimiento"
+        return context
+
+
 class MovementCreateView(CreateView):
     model = Movement
     form_class = MovementForm
     template_name = "inventory/movimiento_form.html"
-    success_url = reverse_lazy(
-        "inventory:nuevo"
-    )  # o "inventory:historial" cuando exista
+    success_url = reverse_lazy("inventory:historial")
 
     def get_initial(self):
         initial = super().get_initial()

@@ -4,7 +4,7 @@ from employees.models import Employee
 from products.models import Product
 from projects.models import Project
 
-from .models import Movement
+from .models import Movement, MovementType
 
 
 class MovementForm(forms.ModelForm):
@@ -90,3 +90,34 @@ class MovementForm(forms.ModelForm):
         if stock is None:
             return str(product)
         return f"{product} · stock: {stock:g}"
+
+
+class MovementFilterForm(forms.Form):
+    """Filtros del historial de movimientos (GET, sin persistencia)."""
+
+    movement_type = forms.ChoiceField(
+        choices=[("", "Todos los tipos")] + MovementType.choices,
+        required=False,
+        label="Tipo de movimiento",
+        widget=forms.Select(attrs={"class": "select"}),
+    )
+    q = forms.CharField(
+        required=False,
+        label="Búsqueda",
+        widget=forms.TextInput(
+            attrs={
+                "class": "input",
+                "placeholder": "Buscar por producto o SKU…",
+            }
+        ),
+    )
+    desde = forms.DateField(
+        required=False,
+        label="Desde",
+        widget=forms.DateInput(attrs={"class": "input", "type": "date"}),
+    )
+    hasta = forms.DateField(
+        required=False,
+        label="Hasta",
+        widget=forms.DateInput(attrs={"class": "input", "type": "date"}),
+    )

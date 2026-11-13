@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Movimientos - AlmacenSys{% endblock %}
+
+{% block breadcrumb_items %}
+<strong>Movimientos</strong>
+<span>/</span> <span>Historial</span>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <div>
+        <h1>Movimientos</h1>
+        <p>Historial de entradas, salidas y ajustes de inventario.</p>
+    </div>
+    <div class="header-actions">
+        <a href="{% url 'inventory:nuevo' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Realizar Movimiento
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Toolbar: filtros server-side -->
+<div class="toolbar">
+    <form method="get"
+          action="{% url 'inventory:historial' %}"
+          class="toolbar-left"
+          style="gap:8px; flex-wrap:wrap;">
+        <div class="toolbar-search">
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="search"
+                   name="q"
+                   value="{{ filter_form.q.value|default:'' }}"
+                   placeholder="Buscar por producto o SKU..."
+                   aria-label="Buscar movimientos por producto o SKU">
+        </div>
+        <select name="movement_type" class="toolbar-select" aria-label="Filtrar por tipo de movimiento">
+            {% for value, label in filter_form.fields.movement_type.choices %}
+            <option value="{{ value }}" {% if filter_form.movement_type.value == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <input type="date"
+               name="desde"
+               value="{{ filter_form.desde.value|default:'' }}"
+               class="input"
+               style="width:auto;"
+               aria-label="Desde">
+        <input type="date"
+               name="hasta"
+               value="{{ filter_form.hasta.value|default:'' }}"
+               class="input"
+               style="width:auto;"
+               aria-label="Hasta">
+        <button type="submit" class="btn btn-secondary btn-sm">Filtrar</button>
+        {% if request.GET %}
+        <a href="{% url 'inventory:historial' %}" class="btn btn-secondary btn-sm">Limpiar</a>
+        {% endif %}
+    </form>
+    <span class="results-count">{{ paginator.count }} movimientos</span>
+</div>
+
+{% if movements %}
+<div class="card">
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Producto</th>
+                    <th>Tipo</th>
+                    <th>Empleado</th>
+                    <th>Proyecto</th>
+                    <th style="text-align:right;">Cantidad</th>
+                    <th style="text-align:right;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movement in movements %}
+                <tr>
+                    <td class="cell-muted">{{ movement.created_at|date:"d M Y H:i" }}</td>
+                    <td>
+                        <div class="table-product">
+                            <div class="table-thumb">{{ movement.product.name|slice:":2"|upper }}</div>
+                            <div>
+                                <span class="cell-primary">{{ movement.product.name }}</span>
+                                <div class="cell-mono">{{ movement.product.sku }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if movement.movement_type == "ENTRY" %}
+                        <span class="badge badge-success"><span class="badge-dot" style="background:var(--success);"></span>Entrada</span>
+                        {% elif movement.movement_type == "EXIT" %}
+                        <span class="badge badge-danger"><span class="badge-dot" style="background:var(--danger);"></span>Salida</span>
+                        {% else %}
+                        <span class="badge badge-info"><span class="badge-dot" style="background:var(--info);"></span>Ajuste</span>
+                        {% endif %}
+                        {% if movement.adjustment_type %}
+                        <div class="cell-muted" style="margin-top:2px;">{{ movement.get_adjustment_type_display }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="cell-muted">
+                        {% if movement.employee %}{{ movement.employee.full_name }}{% else %}Sin empleado{% endif %}
+                    </td>
+                    <td class="cell-muted">
+                        {% if movement.project %}{{ movement.project.name }}{% else %}—{% endif %}
+                    </td>
+                    <td>
+                        <div class="mini-move-qty {% if movement.signed_quantity < 0 %}out{% else %}in{% endif %}" style="justify-content:flex-end;">
+                            {{ movement.signed_quantity|floatformat:"-2" }} {{ movement.product.unit.abbreviation }}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="row-actions" style="justify-content:flex-end;">
+                            <a href="{% url 'inventory:detalle' movement.pk %}"
+                               class="action-btn"
+                               aria-label="Ver detalle"
+                               title="Ver detalle">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if is_paginated %}
+    <nav class="pagination" aria-label="Paginación de movimientos">
+        <span>Página {{ page_obj.number }} de {{ paginator.num_pages }}</span>
+        <div class="pagination-pages">
+            {% if page_obj.has_previous %}
+            <a class="btn btn-secondary btn-sm"
+               href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}">
+                Anterior
+            </a>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a class="btn btn-secondary btn-sm"
+               href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}">
+                Siguiente
+            </a>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</div>
+{% else %}
+<div class="empty-state">
+    <i class="fas {% if request.GET %}fa-search{% else %}fa-exchange-alt{% endif %}"></i>
+    {% if request.GET %}
+    <div class="empty-title">Sin resultados</div>
+    <div class="empty-sub">No hay movimientos que coincidan con los filtros aplicados.</div>
+    {% else %}
+    <div class="empty-title">Sin movimientos</div>
+    <div class="empty-sub">Registra el primer movimiento para comenzar el historial.</div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

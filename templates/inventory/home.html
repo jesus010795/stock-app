@@ -81,6 +81,7 @@
             <div class="card-header-title">
                 <i class="fas fa-history"></i> Últimos 10 Movimientos
             </div>
+            <a href="{% url 'inventory:historial' %}" class="card-link">Ver todos <i class="fas fa-arrow-right"></i></a>
         </div>
         <div class="card-body tight">
             {% if recent_movements %}

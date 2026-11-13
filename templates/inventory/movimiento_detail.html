@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Movimiento #{{ movement.pk }} - AlmacenSys{% endblock %}
+
+{% block breadcrumb_items %}
+<a href="{% url 'inventory:historial' %}">Movimientos</a>
+<span>/</span> <span>#{{ movement.pk }}</span>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <div>
+        <h1>Movimiento #{{ movement.pk }}</h1>
+        <p>Registrado el {{ movement.created_at|date:"d M Y H:i" }}.</p>
+    </div>
+    <div class="header-actions">
+        <a href="{% url 'inventory:historial' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver al historial
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="align-items:start;">
+
+    <!-- Producto y cantidad -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <i class="fas fa-box"></i> Producto y cantidad
+            </div>
+        </div>
+        <div class="card-body tight">
+            <div class="mini-move-row">
+                {% if movement.signed_quantity < 0 %}
+                <div class="move-icon out"><i class="fas fa-arrow-up"></i></div>
+                {% else %}
+                <div class="move-icon in"><i class="fas fa-arrow-down"></i></div>
+                {% endif %}
+                <div class="mini-move-info">
+                    <div class="title">{{ movement.product.name }}</div>
+                    <div class="sub">{{ movement.product.sku }}</div>
+                </div>
+                <div class="mini-move-qty {% if movement.signed_quantity < 0 %}out{% else %}in{% endif %}">
+                    {{ movement.signed_quantity|floatformat:"-2" }} {{ movement.product.unit.abbreviation }}
+                </div>
+            </div>
+            <div class="empty-sub" style="margin-top:10px;">
+                {% if movement.warehouse %}
+                Almacén: <strong>{{ movement.warehouse.name }}</strong>
+                {% else %}
+                Almacén: <strong>Sin almacén</strong>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tipo y justificación -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <i class="fas fa-tags"></i> Tipo y justificación
+            </div>
+        </div>
+        <div class="card-body tight">
+            <div class="mini-project-row">
+                <div class="mini-project-info">
+                    <div>
+                        {% if movement.movement_type == "ENTRY" %}
+                        <span class="badge badge-success"><span class="badge-dot" style="background:var(--success);"></span>Entrada</span>
+                        {% elif movement.movement_type == "EXIT" %}
+                        <span class="badge badge-danger"><span class="badge-dot" style="background:var(--danger);"></span>Salida</span>
+                        {% else %}
+                        <span class="badge badge-info"><span class="badge-dot" style="background:var(--info);"></span>Ajuste</span>
+                        {% endif %}
+                        {% if movement.adjustment_type %}
+                        <span class="badge badge-neutral">{{ movement.get_adjustment_type_display }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="empty-sub" style="margin-top:10px;">
+                Motivo: <strong>{% if movement.reason %}{{ movement.reason }}{% else %}—{% endif %}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Responsables -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <i class="fas fa-users"></i> Responsables
+            </div>
+        </div>
+        <div class="card-body tight">
+            <div class="empty-sub">
+                Empleado: <strong>{% if movement.employee %}{{ movement.employee.full_name }}{% else %}Sin empleado{% endif %}</strong>
+            </div>
+            <div class="empty-sub" style="margin-top:6px;">
+                {% if movement.employee %}
+                Departamento: <strong>{{ movement.employee.department.name }}</strong>
+                {% endif %}
+            </div>
+            <div class="empty-sub" style="margin-top:6px;">
+                Registrado por: <strong>{% if movement.created_by %}{{ movement.created_by.username }}{% else %}Sistema{% endif %}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Proyecto -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <i class="fas fa-project-diagram"></i> Proyecto
+            </div>
+        </div>
+        <div class="card-body tight">
+            {% if movement.project %}
+            <div class="mini-project-row">
+                <div class="mini-project-info">
+                    <div class="project-card-icon" style="width:34px;height:34px;">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <div>
+                        <div class="name">{{ movement.project.name }}</div>
+                        <div class="date">{{ movement.project.code }}</div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-sub">Sin proyecto asociado</div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
