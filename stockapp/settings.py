@@ -77,6 +77,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "stockapp.wsgi.application"
 
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "home"
+LOGOUT_REDIRECT_URL = "home"
+
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases

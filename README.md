@@ -9,7 +9,7 @@ Aplicación web desarrollada con **Python y Django** para administrar productos,
 - **Dashboard** (`/`): alertas de stock bajo (total + los 6 más severos), últimos 10 movimientos, últimos 5 proyectos y feed de actividad reciente.
 - **Productos** (`/productos/lista/`): catálogo con categoría, unidad, almacén y stock calculado en tiempo real.
 - **Proyectos** (`/proyectos/lista/`, `/proyectos/detalle/<pk>/`): ficha con consumo de materiales por proyecto y empleados involucrados.
-- **Movimientos** (`/movimientos/nuevo/`): alta de entradas, salidas y ajustes con validaciones en español; el stock insuficiente se muestra como error de formulario (sin errores 500).
+- **Movimientos** (`/movimientos/`, `/movimientos/<pk>/`, `/movimientos/nuevo/`): historial con filtros, detalle de solo lectura y alta de entradas, salidas y ajustes. El alta exige un usuario staff; el stock insuficiente se muestra como error de formulario (sin errores 500).
 - **Admin Django** (`/admin/`) en español para gestionar todas las entidades. Los movimientos son inmutables (sin borrado).
 - **Trazabilidad**: motivo, proyecto, empleado, almacén y usuario que registró cada movimiento.
 
@@ -90,13 +90,21 @@ La conexión usa `localhost:5432` por defecto (`POSTGRES_HOST`/`POSTGRES_PORT` o
 
 > `db.sqlite3`, `media/`, `docs/` y `commits.txt` están en `.gitignore`: este repositorio es el código, no los datos locales ni la bitácora de trabajo.
 
+## Acceso
+
+Las páginas de lectura (dashboard, historial, productos, proyectos y empleados) se consultan sin sesión. Registrar un movimiento exige iniciar sesión en `/accounts/login/` con un usuario activo y `is_staff=True`.
+
+Las cuentas se crean desde el admin. Marca **Es staff** y no concedas permisos de modelo salvo que esa persona deba administrar: `is_staff` también abre `/admin/`, pero sin permisos de modelo el admin no deja editar registros.
+
+Cerrar sesión se hace desde el menú superior (POST con CSRF). No hay registro público ni recuperación de contraseña.
+
 ## Tests
 
 ```bash
-python manage.py test inventory products
+python manage.py test inventory products stockapp
 ```
 
-66 tests cubren: formulario y vista de movimientos, modelo y reglas de negocio, service transaccional, constraints de base de datos, stock por producto, selector de actividad y bloque de stock bajo del dashboard.
+95 tests cubren: formulario y vista de movimientos, autorización del alta, modelo y reglas de negocio, service transaccional, constraints de base de datos, stock por producto, selector de actividad, bloque de stock bajo del dashboard y login staff. Hay que nombrar `stockapp`: es el paquete del proyecto, no una app instalada, y `manage.py test` sin etiquetas no descubre `stockapp/tests.py`.
 
 ## Rutas principales
 
@@ -106,14 +114,12 @@ python manage.py test inventory products
 | `/productos/lista/` | Listado de productos |
 | `/proyectos/lista/` y `/proyectos/detalle/<pk>/` | Proyectos |
 | `/movimientos/` y `/movimientos/<pk>/` | Historial y detalle de movimientos |
-| `/movimientos/nuevo/` | Alta de movimiento |
+| `/movimientos/nuevo/` | Alta de movimiento (requiere staff) |
+| `/accounts/login/` | Inicio de sesión (solo staff) |
 | `/admin/` | Administración de Django |
 
 ## Próximas mejoras
 
-- [ ] Autenticación y control de acceso en las vistas públicas (hoy el dashboard y el formulario no requieren login).
-- [ ] Historial y detalle de movimientos (rutas ya esbozadas).
-- [ ] Parte 3 de concurrencia: `select_for_update()` sobre el producto para cerrar la carrera de lectura-validación-escritura en PostgreSQL.
 - [ ] Migración del admin al service `register_movement` (AP-11).
 
 ## Autor

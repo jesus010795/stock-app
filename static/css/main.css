@@ -411,6 +411,28 @@
 }
 .user-dropdown a.danger { color: var(--danger); }
 .user-dropdown a.danger svg { color: var(--danger); }
+.user-dropdown form { margin: 0; }
+.user-dropdown button.danger {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 9px 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-size: 13px;
+    color: var(--danger);
+    cursor: pointer;
+    text-align: left;
+}
+.user-dropdown button.danger:hover { background: var(--bg); }
+.user-dropdown button.danger i { width: 15px; text-align: center; color: var(--danger); }
+
+.topbar-login {
+    padding: 8px 14px;
+    font-size: 13px;
+}
 
 /* LEGACY: topbar vieja (topbar.html anterior a Fase 4) */
 .topbar-left {

@@ -12,6 +12,7 @@
             <span class="dot"></span>
         </button>
 
+        {% if request.user.is_authenticated %}
         <div class="user-menu">
             <div class="user-trigger" data-user-trigger>
                 <div class="avatar">{{ request.user.first_name|first|default:"U" }}{{ request.user.last_name|first|default:"S" }}</div>
@@ -25,8 +26,16 @@
                 <a href=""><i class="fas fa-user"></i> Mi Perfil</a>
                 <a href=""><i class="fas fa-cog"></i> Configuración</a>
                 <hr>
-                <a href="" class="danger"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</a>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="danger">
+                        <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                    </button>
+                </form>
             </div>
         </div>
+        {% else %}
+        <a href="{% url 'login' %}" class="btn btn-primary topbar-login">Iniciar sesión</a>
+        {% endif %}
     </div>
 </header>

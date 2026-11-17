@@ -1,9 +1,11 @@
 from datetime import datetime, time, timedelta
 
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, TemplateView
 from products.models import Product
@@ -17,6 +19,19 @@ from .services import register_movement
 
 # Create your views here.
 LOW_STOCK_DISPLAY_LIMIT = 6
+STAFF_REQUIRED_MESSAGE = (
+    "Tu cuenta no tiene permisos para registrar movimientos."
+)
+
+
+class StaffRequiredMixin(LoginRequiredMixin):
+    """Sesión y is_staff. Anónimo va al login; no-staff vuelve al dashboard."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not request.user.is_staff:
+            messages.error(request, STAFF_REQUIRED_MESSAGE)
+            return redirect("home")
+        return super().dispatch(request, *args, **kwargs)
 
 
 class HomeView(TemplateView):
@@ -96,7 +111,7 @@ class MovementDetailView(DetailView):
         return context
 
 
-class MovementCreateView(CreateView):
+class MovementCreateView(StaffRequiredMixin, CreateView):
     model = Movement
     form_class = MovementForm
     template_name = "inventory/movimiento_form.html"

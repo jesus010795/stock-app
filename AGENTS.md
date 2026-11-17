@@ -6,14 +6,21 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 
 - Use the local venv: `venv/bin/python manage.py <cmd>` (activate `venv/bin/activate`). Django is installed only there — do not `pip install` globally.
 - Run server: `venv/bin/python manage.py runserver`
-- Run tests: `venv/bin/python manage.py test inventory products` (77 tests: MovementForm + MovementCreateView + Movement model baseline + Product stock + Recent activity selector + Low stock queryset + Dashboard low stock block + Movement service + Movement constraints + Movement indexes + Movement concurrency + Movement history; the concurrency test is skipped on SQLite because `select_for_update` is unsupported). `projects`, `employees`, and `warehouses` tests are still empty stubs.
-- Database: PostgreSQL by default in this machine (`POSTGRES_DB=stockapp POSTGRES_USER=stockapp POSTGRES_PASSWORD=stockapp`); without `POSTGRES_DB`, SQLite `db.sqlite3` is the dev fallback. Both engines run the same 77 tests green (1 skipped on SQLite).
+- Run tests: `venv/bin/python manage.py test inventory products stockapp` (95 tests: MovementForm + MovementCreateView + Movement authorization + Movement model baseline + Product stock + Recent activity selector + Low stock queryset + Dashboard low stock block + Movement service + Movement constraints + Movement indexes + Movement concurrency + Movement history + staff login; the concurrency test is skipped on SQLite because `select_for_update` is unsupported). Name `stockapp` explicitly: it is the project package, not an installed app, so a bare `manage.py test` does not discover `stockapp/tests.py`. `projects`, `employees`, and `warehouses` tests are still empty stubs.
+- Database: PostgreSQL by default in this machine (`POSTGRES_DB=stockapp POSTGRES_USER=stockapp POSTGRES_PASSWORD=stockapp`); without `POSTGRES_DB`, SQLite `db.sqlite3` is the dev fallback. Both engines run the same 95 tests green (1 skipped on SQLite).
 - `manage.py check` passes clean.
 
 ## Movement form (completed 09-2026; plan: docs/plan_completar_movementform.md)
 
 - `MovementForm` (`inventory/forms.py`): Spanish labels/help_texts/error_messages, design-system widget classes (`.input`/`.select`/`.textarea`), filtered querysets (active products with stock in the option label, active employees, CREATED/APPROVED projects). `warehouse` is NOT a form field — `Movement.clean()` autofills it from `product.warehouse`.
-- `MovementCreateView` (`inventory/views.py`): `?producto=<pk>` prefills (garbage-safe); `form_valid` sets `created_by`, saves inside `try/except ValidationError` and re-injects errors with `form.add_error` → insufficient stock re-renders the form (no 500). The stock rule stays in `Movement.save()` only.
+- `MovementCreateView` (`inventory/views.py`): `StaffRequiredMixin` (session + `is_staff`); `?producto=<pk>` prefills (garbage-safe); `form_valid` sets `created_by`, saves inside `try/except ValidationError` and re-injects errors with `form.add_error` → insufficient stock re-renders the form (no 500). The stock rule stays in `Movement.save()` only.
+
+## Authentication (frontend)
+
+- Login is staff-only. `StaffLoginForm` (`stockapp/forms.py`) uses one generic message for bad credentials, unknown users and inactive accounts (`ModelBackend` never returns inactive users, so `confirm_login_allowed()` does not see them). Active non-staff get a distinct permissions error after `super()`.
+- Writes: only `MovementCreateView`. Anonymous requests redirect to `login` with `next` (including `?producto=`). Authenticated non-staff redirect to `home` with an error message and nothing is created. Staff keeps the previous flow; `created_by` is that user.
+- Reads stay public: dashboard, movement history/detail, products, projects, employees. Django admin stays staff-only on its own.
+- Logout is POST + CSRF (`LogoutView` rejects GET with 405). No public signup or password reset. Accounts are created in the admin with `is_staff=True` and no model permissions unless that person should administer. `is_staff` also opens `/admin/`.
 
 ## Architecture
 
@@ -33,7 +40,7 @@ Django monorepo-less project (Python 3.10, Django ~5.2). StockApp = inventory ma
 
 - All user-facing text is **Spanish** (model `verbose_name`, admin, templates, error messages, docs). Keep new strings in Spanish.
 - Docs are authoritative but **gitignored**: `docs/rev01/` (análisis y planes históricos, resúmenes), `docs/rev02/` (guía de arquitectura, análisis, notas técnicas y cierre del refactor de inventario; prefijos `NN_` por orden cronológico). `commits.txt` (also gitignored) records intended commit history and may drift from `git log`. Every new block in `commits.txt` MUST start with its commit number (`commit N (...)`); derive N from `git log --oneline | wc -l` + 1 and mark entries as executed once they appear in `git log`.
-- The inventory refactor is **closed** (commits 35–51): incremental reorganization by layers (models → QuerySet/Service/Selector), single source of truth for the stock calculation, DB integrity hardening (`CheckConstraint`s) and performance optimization (dashboard queries and indexes). Final state and lessons in `docs/rev02/07_estado_final_plan_c0_c8_05_11_2026.md` and `docs/rev02/08_resumen_cierre_c0_c8_05_11_2026.md`. Pending: login/permisos, admin → service (AP-11), push a GitHub.
+- The inventory refactor is **closed** (commits 35–51): incremental reorganization by layers (models → QuerySet/Service/Selector), single source of truth for the stock calculation, DB integrity hardening (`CheckConstraint`s) and performance optimization (dashboard queries and indexes). Final state and lessons in `docs/rev02/07_estado_final_plan_c0_c8_05_11_2026.md` and `docs/rev02/08_resumen_cierre_c0_c8_05_11_2026.md`. Pending: admin → service (AP-11), push a GitHub.
 - PostgreSQL migration **done** (2026-11-05; see `docs/rev02/10_migracion_postgresql_05_11_2026.md`): PostgreSQL 14 local is the main dev DB via env vars; SQLite remains the fallback. Parte 3 (concurrency) **done** on PostgreSQL (2026-11-05; see `docs/rev02/11_parte3_resultados_postgresql_05_11_2026.md`): `select_for_update()` on the product row in the service, verified with a 50-round concurrent experiment (49/50 violations without the lock vs 0/50 with it).
 - `db.sqlite3` and `media/` are gitignored (local only); migrations are tracked. A fresh clone needs `migrate`.
 - Frontend: plain Django templates in `templates/` (`base.html` = sidebar + topbar + content; `inventory/home.html` is the single view) + hand-written CSS in `static/css/` (`base.css`, `main.css`, `components.css`, `dashboard.css`). No JS framework.

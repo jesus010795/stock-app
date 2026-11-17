@@ -263,6 +263,8 @@ class MovementFormValidationTest(MovementFormTestBase):
 
 class MovementCreateViewTest(MovementFormTestBase):
     def setUp(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
         self.client.force_login(self.user)
 
     def test_get_renders_form(self):
@@ -315,6 +317,87 @@ class MovementCreateViewTest(MovementFormTestBase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Stock insuficiente")
+
+
+class MovementCreateAuthorizationTest(MovementFormTestBase):
+    def test_anonymous_get_redirects_to_login(self):
+        response = self.client.get(self.url())
+        self.assertRedirects(
+            response, f"{reverse('login')}?next={self.url()}"
+        )
+
+    def test_anonymous_post_redirects_and_creates_nothing(self):
+        before = Movement.objects.count()
+        response = self.client.post(self.url(), self.form_data())
+        self.assertRedirects(
+            response, f"{reverse('login')}?next={self.url()}"
+        )
+        self.assertEqual(Movement.objects.count(), before)
+
+    def test_next_preserves_product_query(self):
+        next_url = f"{self.url()}?producto={self.product.pk}"
+        response = self.client.get(self.url(), {"producto": self.product.pk})
+        self.assertRedirects(response, f"{reverse('login')}?next={next_url}")
+
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        login = self.client.post(
+            reverse("login"),
+            {
+                "username": "tester",
+                "password": "test1234",
+                "next": next_url,
+            },
+        )
+        self.assertRedirects(login, next_url)
+        followed = self.client.get(next_url)
+        self.assertContains(
+            followed, f'<option value="{self.product.pk}" selected'
+        )
+
+    def test_staff_creates_movement_with_created_by(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        self.client.force_login(self.user)
+        response = self.client.post(self.url(), self.form_data())
+        self.assertRedirects(response, reverse("inventory:historial"))
+        movement = Movement.objects.get(movement_type=MovementType.EXIT)
+        self.assertEqual(movement.created_by, self.user)
+
+    def test_authenticated_non_staff_is_sent_home_and_creates_nothing(self):
+        self.client.force_login(self.user)
+        before = Movement.objects.count()
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                if method == "post":
+                    response = self.client.post(
+                        self.url(), self.form_data(), follow=True
+                    )
+                else:
+                    response = self.client.get(self.url(), follow=True)
+                self.assertRedirects(response, reverse("home"))
+                self.assertContains(
+                    response,
+                    "Tu cuenta no tiene permisos para registrar movimientos.",
+                )
+                self.assertEqual(Movement.objects.count(), before)
+
+    def test_anonymous_reads_stay_public(self):
+        movement = Movement.objects.get(reason="Carga inicial")
+        urls = [
+            reverse("home"),
+            reverse("inventory:historial"),
+            reverse("inventory:detalle", args=[movement.pk]),
+            reverse("products:products_list"),
+            reverse("projects:projects_list"),
+            reverse("projects:project_detail", args=[self.project_approved.pk]),
+            reverse("employees:employees_list"),
+            reverse("employees:employee_detail", args=[self.employee.pk]),
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
 
 
 class MovementModelBaselineTest(MovementFormTestBase):

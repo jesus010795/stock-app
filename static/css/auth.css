@@ -1,0 +1,92 @@
+/* ===========================================================
+   AlmacenSys — auth.css
+   Pantalla de login, independiente de base.html.
+   Reutiliza variables de main.css y .input/.btn de components.css.
+   =========================================================== */
+
+.auth-body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background:
+        radial-gradient(ellipse at top, rgba(124, 92, 252, 0.16), transparent 55%),
+        var(--bg);
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 36px 32px 32px;
+}
+
+.auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+.auth-brand-text .brand-name {
+    color: var(--text);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+}
+
+.auth-brand-text .brand-sub {
+    color: var(--text-faint);
+    font-size: 11.5px;
+    margin-top: 1px;
+}
+
+.auth-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+}
+
+.auth-subtitle {
+    color: var(--text-muted);
+    font-size: 13.5px;
+    margin: 6px 0 22px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.auth-errors {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 13px;
+}
+
+.auth-errors .errorlist {
+    margin: 0;
+    padding: 0;
+}
+
+.auth-submit {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+    padding: 12px 18px;
+}
+
+@media (max-width: 480px) {
+    .auth-card {
+        padding: 28px 20px 24px;
+    }
+}

@@ -16,11 +16,24 @@ Including another URLconf
 """
 
 from django.contrib import admin
+from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import include, path
 from inventory.views import HomeView
 
+from .forms import StaffLoginForm
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path(
+        "accounts/login/",
+        LoginView.as_view(
+            authentication_form=StaffLoginForm,
+            template_name="registration/login.html",
+            redirect_authenticated_user=True,
+        ),
+        name="login",
+    ),
+    path("accounts/logout/", LogoutView.as_view(), name="logout"),
     path("", HomeView.as_view(), name="home"),
     path("movimientos/", include("inventory.urls")),
     path("productos/", include("products.urls")),
