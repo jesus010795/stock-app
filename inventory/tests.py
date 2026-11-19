@@ -117,7 +117,11 @@ class MovementFormPresentationTest(MovementFormTestBase):
 
     def test_widgets_use_design_system_classes(self):
         form = MovementForm()
-        self.assertIn('class="select"', str(form["product"]))
+        # El producto es un hidden input alimentado por el buscador con
+        # autocompletado (static/js/product-autocomplete.js); el input
+        # visible vive en la plantilla.
+        self.assertIn('<input type="hidden" name="product"', str(form["product"]))
+        self.assertIn('class="select"', str(form["movement_type"]))
         self.assertIn('class="input"', str(form["quantity"]))
         self.assertIn('step="0.01"', str(form["quantity"]))
         self.assertIn('class="textarea"', str(form["reason"]))
@@ -159,7 +163,6 @@ class MovementFormQuerySetTest(MovementFormTestBase):
 
     def test_optional_selects_have_spanish_empty_labels(self):
         form = MovementForm()
-        self.assertEqual(form.fields["product"].empty_label, "Seleccione un producto…")
         self.assertEqual(form.fields["employee"].empty_label, "Seleccione un empleado…")
         self.assertEqual(form.fields["project"].empty_label, "Sin proyecto")
 
@@ -170,7 +173,10 @@ class MovementFormQuerySetTest(MovementFormTestBase):
 
     def test_selects_render_without_n_plus_one(self):
         form = MovementForm()
-        with self.assertNumQueries(3):
+        # El producto es un hidden input (0 consultas: el buscador pide
+        # las opciones al endpoint JSON bajo demanda). Empleado y
+        # proyecto siguen siendo selects: 1 consulta cada uno.
+        with self.assertNumQueries(2):
             str(form["product"])
             str(form["employee"])
             str(form["project"])
@@ -275,10 +281,14 @@ class MovementCreateViewTest(MovementFormTestBase):
     def test_prefills_product_from_query_param(self):
         response = self.client.get(self.url(), {"producto": self.product.pk})
         self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            f'<option value="{self.product.pk}" selected',
-            response.content.decode(),
+        # El pk llega al hidden input; el buscador pide la etiqueta al
+        # endpoint (?id=) al cargar la página.
+        self.assertContains(
+            response,
+            f'<input type="hidden" name="product" value="{self.product.pk}"',
         )
+        self.assertContains(response, "data-autocomplete-input")
+        self.assertContains(response, reverse("inventory:buscar-productos"))
 
     def test_invalid_product_query_param_does_not_break(self):
         response = self.client.get(self.url(), {"producto": "abc"})
@@ -352,7 +362,8 @@ class MovementCreateAuthorizationTest(MovementFormTestBase):
         self.assertRedirects(login, next_url)
         followed = self.client.get(next_url)
         self.assertContains(
-            followed, f'<option value="{self.product.pk}" selected'
+            followed,
+            f'<input type="hidden" name="product" value="{self.product.pk}"',
         )
 
     def test_staff_creates_movement_with_created_by(self):
@@ -398,6 +409,101 @@ class MovementCreateAuthorizationTest(MovementFormTestBase):
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
+
+
+class ProductSearchEndpointTest(MovementFormTestBase):
+    """Autocompletado del campo producto: /movimientos/productos/buscar/.
+
+    Endpoint JSON exclusivo de staff que alimenta el buscador en
+    tiempo real de MovementCreateView (fetch + debounce).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.staff = User.objects.create_user(
+            username="search-staff", password="test1234", is_staff=True
+        )
+        cls.non_staff = User.objects.create_user(
+            username="search-normal", password="test1234"
+        )
+        # 12 productos que comparten la palabra "serie" para probar el
+        # tope de resultados (PRODUCT_SEARCH_LIMIT = 10).
+        for i in range(1, 13):
+            Product.objects.create(
+                sku=f"SER-{i:04d}",
+                name=f"Tornillo serie {i}",
+                category=cls.category,
+                unit=cls.unit,
+                warehouse=cls.warehouse,
+            )
+
+    def search(self, user=None, **params):
+        if user is None:
+            self.client.logout()
+        else:
+            self.client.force_login(user)
+        return self.client.get(
+            reverse("inventory:buscar-productos"), params or {}
+        )
+
+    def test_staff_search_by_sku_and_by_name(self):
+        for query in (self.product.sku, "cable de prueba"):
+            with self.subTest(query=query):
+                response = self.search(user=self.staff, q=query)
+                self.assertEqual(response.status_code, 200)
+                results = response.json()["results"]
+                self.assertEqual(len(results), 1)
+                self.assertEqual(results[0]["id"], self.product.pk)
+                self.assertIn("stock: 100", results[0]["label"])
+                self.assertEqual(results[0]["stock"], "100")
+
+    def test_search_excludes_inactive_products(self):
+        response = self.search(user=self.staff, q="TST-0002")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"], [])
+
+    def test_query_below_min_length_returns_empty(self):
+        for query in ("", "a", "  a "):
+            with self.subTest(query=query):
+                response = self.search(user=self.staff, q=query)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["results"], [])
+
+    def test_results_are_capped_at_the_limit(self):
+        response = self.search(user=self.staff, q="serie")
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 10)
+        self.assertTrue(all("Tornillo" in r["label"] for r in results))
+
+    def test_id_lookup_returns_only_active_products(self):
+        response = self.search(user=self.staff, id=self.product.pk)
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual([r["id"] for r in results], [self.product.pk])
+        self.assertIn("stock: 100", results[0]["label"])
+
+    def test_id_lookup_ignores_inactive_and_unknown(self):
+        for product_id in (self.inactive_product.pk, 99999, "abc"):
+            with self.subTest(product_id=product_id):
+                response = self.search(user=self.staff, id=product_id)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["results"], [])
+
+    def test_requires_staff(self):
+        for user, expected in ((None, 403), (self.non_staff, 403)):
+            with self.subTest(user=user):
+                response = self.search(user=user, q="cable")
+                self.assertEqual(response.status_code, expected)
+                self.assertEqual(response.json()["error"], "No autorizado")
+
+    def test_post_is_rejected(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse("inventory:buscar-productos"), {"q": "cable"}
+        )
+        self.assertEqual(response.status_code, 405)
 
 
 class MovementModelBaselineTest(MovementFormTestBase):

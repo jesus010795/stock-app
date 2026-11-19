@@ -27,7 +27,13 @@ class MovementForm(forms.ModelForm):
             "reason": "Motivo",
         }
         widgets = {
-            "product": forms.Select(attrs={"class": "select"}),
+            # El producto no se elige de un desplegable: el campo queda
+            # oculto y la plantilla monta un buscador con autocompletado
+            # (templates/inventory/movimiento_form.html + static/js/
+            # product-autocomplete.js) contra el endpoint JSON
+            # inventory:buscar-productos. La validación del pk no cambia:
+            # ModelChoiceField sigue rechazando valores fuera del queryset.
+            "product": forms.HiddenInput(),
             "movement_type": forms.Select(attrs={"class": "select"}),
             "adjustment_type": forms.Select(attrs={"class": "select"}),
             "quantity": forms.NumberInput(
@@ -49,6 +55,7 @@ class MovementForm(forms.ModelForm):
             ),
         }
         help_texts = {
+            "product": "Escriba al menos 2 caracteres y seleccione una opción de la lista",
             "movement_type": "Entrada, salida o ajuste de inventario",
             "adjustment_type": "Solo aplica para ajustes",
             "employee": "Quién solicita o registra el movimiento",
@@ -74,9 +81,11 @@ class MovementForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Queryset de validación: solo productos activos. El desplegable
+        # con las opciones ya no existe (ver widgets["product"]); la
+        # etiqueta de cada opción la construye product_option_label y la
+        # consume el endpoint de autocompletado.
         self.fields["product"].queryset = Product.objects.active().with_stock()
-        self.fields["product"].label_from_instance = self.product_option_label
-        self.fields["product"].empty_label = "Seleccione un producto…"
         self.fields["employee"].queryset = Employee.objects.filter(
             is_active=True
         ).select_related("department")
@@ -86,6 +95,11 @@ class MovementForm(forms.ModelForm):
 
     @staticmethod
     def product_option_label(product):
+        """Etiqueta de cada opción de producto (SKU - nombre · stock).
+
+        La consume el endpoint de autocompletado buscar_productos: exige
+        que el queryset haya anexado `.stock` (with_stock()).
+        """
         stock = getattr(product, "stock", None)
         if stock is None:
             return str(product)

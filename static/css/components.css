@@ -361,6 +361,71 @@
 }
 .form-section-title svg { width: 15px; height: 15px; color: var(--purple); }
 
+/* Autocomplete (buscador del campo producto en el form de movimientos).
+   El JS (product-autocomplete.js) inyecta las opciones en .autocomplete-list. */
+.autocomplete { position: relative; }
+.autocomplete-input-wrap { position: relative; }
+.autocomplete-input-wrap .input { padding-right: 40px; }
+.autocomplete-clear {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 7px;
+    background: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.autocomplete-clear i { font-size: 12px; }
+.autocomplete-clear:hover { background: var(--danger-bg); color: var(--danger); }
+.autocomplete-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 30;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.autocomplete-option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: none;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.autocomplete-option:hover,
+.autocomplete-option.active {
+    background: var(--purple-light);
+    color: var(--purple-darker);
+    font-weight: 600;
+}
+.autocomplete-empty {
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: var(--text-faint);
+}
+
+
 
 /* ===========================================================
    TABLES

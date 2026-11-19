@@ -30,6 +30,36 @@
             {% endif %}
 
             {% for field in form %}
+            {% if field.name == "product" %}
+            <div class="form-group">
+                <label for="producto-busqueda">{{ field.label }}</label>
+                {{ field }}
+                <div class="autocomplete" data-autocomplete
+                     data-autocomplete-url="{% url 'inventory:buscar-productos' %}">
+                    <div class="autocomplete-input-wrap">
+                        <input type="text" id="producto-busqueda" class="input"
+                               autocomplete="off"
+                               placeholder="Busque por nombre o SKU…"
+                               role="combobox" aria-expanded="false"
+                               aria-autocomplete="list"
+                               data-autocomplete-input
+                               data-autocomplete-hidden="id_product">
+                        <button type="button" class="autocomplete-clear"
+                                data-autocomplete-clear
+                                aria-label="Quitar el producto seleccionado" hidden>
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <ul class="autocomplete-list" data-autocomplete-list hidden></ul>
+                </div>
+                {% if field.errors %}
+                <div class="field-error">{{ field.errors }}</div>
+                {% endif %}
+                {% if field.help_text %}
+                <small class="field-help">{{ field.help_text }}</small>
+                {% endif %}
+            </div>
+            {% else %}
             <div class="form-group">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
@@ -40,6 +70,7 @@
                 <small class="field-help">{{ field.help_text }}</small>
                 {% endif %}
             </div>
+            {% endif %}
             {% endfor %}
 
             <div class="form-actions">
@@ -53,4 +84,8 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/product-autocomplete.js' %}" defer></script>
 {% endblock %}
