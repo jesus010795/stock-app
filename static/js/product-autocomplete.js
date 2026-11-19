@@ -13,7 +13,8 @@
 
    El input visible NO es parte del form: el pk elegido se escribe en
    el campo oculto `id_product` y el servidor valida como siempre.
-   JS puro, sin dependencias.
+   JS puro, sin dependencias. Con la lista abierta, Enter elige la
+   opción resaltada (o la primera) y no envía el formulario; Tab la cierra.
    =========================================================== */
 
 (function () {
@@ -56,6 +57,12 @@
       closeList();
     }
 
+    // Misma ruta para el mouse y para Enter. No usar .click(): el
+    // listener del botón es mousedown, y click() no lo dispara.
+    function chooseOption(option) {
+      setSelected(option.getAttribute("data-id"), option.textContent);
+    }
+
     function renderResults(items) {
       list.innerHTML = "";
       activeIndex = -1;
@@ -75,12 +82,13 @@
         var button = document.createElement("button");
         button.type = "button";
         button.className = "autocomplete-option";
+        button.setAttribute("data-id", item.id);
         button.textContent = item.label;
         // mousedown + preventDefault: el input no pierde el foco antes
         // de que el click llegue, así no hay carrera con el cierre.
         button.addEventListener("mousedown", function (event) {
           event.preventDefault();
-          setSelected(item.id, item.label);
+          chooseOption(button);
         });
         li.appendChild(button);
         list.appendChild(li);
@@ -143,16 +151,26 @@
         closeList();
         return;
       }
-      if (list.hidden || !options().length) return;
+      // Tab mueve el foco: la lista no debe quedarse abierta.
+      if (event.key === "Tab") {
+        closeList();
+        return;
+      }
+      if (list.hidden) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        var items = options();
+        if (!items.length) return;
+        chooseOption(items[activeIndex >= 0 ? activeIndex : 0]);
+        return;
+      }
+      if (!options().length) return;
       if (event.key === "ArrowDown") {
         event.preventDefault();
         moveActive(1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         moveActive(-1);
-      } else if (event.key === "Enter" && activeIndex >= 0) {
-        event.preventDefault();
-        options()[activeIndex].click();
       }
     });
 
@@ -167,9 +185,12 @@
 
     // Prefijado: si el hidden trae pk (?producto= o re-render con
     // errores), pide la etiqueta al endpoint para pintarla en el input.
-    if (hidden.value) {
+    // Si el usuario escribió o limpió antes de que llegue la respuesta,
+    // no se pisa el texto.
+    var prefillId = hidden.value;
+    if (prefillId) {
       fetch(
-        url + "?id=" + encodeURIComponent(hidden.value),
+        url + "?id=" + encodeURIComponent(prefillId),
         { credentials: "same-origin" }
       )
         .then(function (response) {
@@ -177,6 +198,7 @@
           return response.json();
         })
         .then(function (data) {
+          if (hidden.value !== prefillId || input.value) return;
           var item = (data.results || [])[0];
           if (item) setSelected(item.id, item.label);
         })
