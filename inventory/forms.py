@@ -83,27 +83,16 @@ class MovementForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Queryset de validación: solo productos activos. El desplegable
         # con las opciones ya no existe (ver widgets["product"]); la
-        # etiqueta de cada opción la construye product_option_label y la
-        # consume el endpoint de autocompletado.
-        self.fields["product"].queryset = Product.objects.active().with_stock()
+        # etiqueta de cada opción la arma selectors.product_label y la
+        # consume el endpoint de autocompletado. Sin with_stock(): el
+        # ModelChoiceField con HiddenInput solo necesita validar el pk.
+        self.fields["product"].queryset = Product.objects.active()
         self.fields["employee"].queryset = Employee.objects.filter(
             is_active=True
         ).select_related("department")
         self.fields["employee"].empty_label = "Seleccione un empleado…"
         self.fields["project"].queryset = Project.objects.active()
         self.fields["project"].empty_label = "Sin proyecto"
-
-    @staticmethod
-    def product_option_label(product):
-        """Etiqueta de cada opción de producto (SKU - nombre · stock).
-
-        La consume el endpoint de autocompletado buscar_productos: exige
-        que el queryset haya anexado `.stock` (with_stock()).
-        """
-        stock = getattr(product, "stock", None)
-        if stock is None:
-            return str(product)
-        return f"{product} · stock: {stock:g}"
 
 
 class MovementFilterForm(forms.Form):

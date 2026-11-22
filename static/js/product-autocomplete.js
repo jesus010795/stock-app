@@ -13,8 +13,12 @@
 
    El input visible NO es parte del form: el pk elegido se escribe en
    el campo oculto `id_product` y el servidor valida como siempre.
-   JS puro, sin dependencias. Con la lista abierta, Enter elige la
-   opción resaltada (o la primera) y no envía el formulario; Tab la cierra.
+   JS puro, sin dependencias.
+
+   Teclado: con la lista abierta, Enter elige la opción resaltada (o la
+   primera) y nunca envía el formulario. Si todavía hay una búsqueda en
+   curso (debounce o fetch), Enter la resuelve y elige el primer
+   resultado. Tab cierra la lista.
    =========================================================== */
 
 (function () {
@@ -38,6 +42,9 @@
     var debounceTimer = null;
     var inFlight = null;
     var activeIndex = -1;
+    var pendingQuery = null;
+    var selectFirstAfterSearch = false;
+    var lastSelectedLabel = null;
 
     function options() {
       return list.querySelectorAll(".autocomplete-option");
@@ -50,9 +57,21 @@
       input.setAttribute("aria-expanded", "false");
     }
 
+    function cancelSearch() {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+      pendingQuery = null;
+      selectFirstAfterSearch = false;
+      if (inFlight) {
+        inFlight.abort();
+        inFlight = null;
+      }
+    }
+
     function setSelected(id, label) {
       hidden.value = id ? String(id) : "";
       input.value = label || "";
+      lastSelectedLabel = id ? label : null;
       clearButton.hidden = !id;
       closeList();
     }
@@ -60,7 +79,15 @@
     // Misma ruta para el mouse y para Enter. No usar .click(): el
     // listener del botón es mousedown, y click() no lo dispara.
     function chooseOption(option) {
+      cancelSearch();
       setSelected(option.getAttribute("data-id"), option.textContent);
+    }
+
+    function chooseAt(index) {
+      var items = options();
+      if (!items.length) return;
+      var safeIndex = index >= 0 && index < items.length ? index : 0;
+      chooseOption(items[safeIndex]);
     }
 
     function renderResults(items) {
@@ -73,6 +100,7 @@
         empty.textContent = "Sin resultados";
         list.appendChild(empty);
         list.hidden = false;
+        input.setAttribute("aria-expanded", "true");
         return;
       }
 
@@ -90,6 +118,11 @@
           event.preventDefault();
           chooseOption(button);
         });
+        // Respaldo para navegadores/rutas que solo emiten click.
+        button.addEventListener("click", function (event) {
+          event.preventDefault();
+          chooseOption(button);
+        });
         li.appendChild(button);
         list.appendChild(li);
       });
@@ -100,21 +133,34 @@
 
     function fetchJson(query) {
       if (inFlight) inFlight.abort();
-      inFlight = new AbortController();
+      var request = new AbortController();
+      inFlight = request;
+
       fetch(
         url + "?q=" + encodeURIComponent(query),
-        { credentials: "same-origin", signal: inFlight.signal }
+        { credentials: "same-origin", signal: request.signal }
       )
         .then(function (response) {
           if (!response.ok) throw new Error("HTTP " + response.status);
           return response.json();
         })
         .then(function (data) {
+          if (request !== inFlight) return;
+          inFlight = null;
+          pendingQuery = null;
           renderResults(data.results || []);
+          if (selectFirstAfterSearch) {
+            selectFirstAfterSearch = false;
+            chooseAt(0);
+          }
         })
         .catch(function (error) {
           // AbortError = llegó una tecla más nueva: no es un fallo.
-          if (error.name !== "AbortError") closeList();
+          if (error.name === "AbortError" || request !== inFlight) return;
+          inFlight = null;
+          pendingQuery = null;
+          selectFirstAfterSearch = false;
+          closeList();
         });
     }
 
@@ -129,42 +175,68 @@
     }
 
     input.addEventListener("input", function () {
+      // Un evento input que el navegador dispare al pintar la etiqueta
+      // elegida no debe borrar el pk recién seleccionado.
+      if (lastSelectedLabel !== null && input.value === lastSelectedLabel) {
+        return;
+      }
+      lastSelectedLabel = null;
+
       // Editar el texto descarta la selección anterior: el hidden se
       // limpia y el servidor valida solo lo que vuelva a elegirse.
       hidden.value = "";
       clearButton.hidden = true;
+      cancelSearch();
 
       var query = input.value.trim();
       if (query.length < MIN_LENGTH) {
-        clearTimeout(debounceTimer);
         closeList();
         return;
       }
-      clearTimeout(debounceTimer);
+      pendingQuery = query;
       debounceTimer = setTimeout(function () {
+        debounceTimer = null;
         fetchJson(query);
       }, DEBOUNCE_MS);
     });
 
     input.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
+        cancelSearch();
         closeList();
         return;
       }
       // Tab mueve el foco: la lista no debe quedarse abierta.
       if (event.key === "Tab") {
+        cancelSearch();
         closeList();
         return;
       }
-      if (list.hidden) return;
       if (event.key === "Enter") {
-        event.preventDefault();
-        var items = options();
-        if (!items.length) return;
-        chooseOption(items[activeIndex >= 0 ? activeIndex : 0]);
+        if (!list.hidden) {
+          // Lista abierta (también con "Sin resultados"): Enter elige,
+          // nunca envía el formulario.
+          event.preventDefault();
+          var items = options();
+          if (!items.length) return;
+          chooseAt(activeIndex >= 0 ? activeIndex : 0);
+          return;
+        }
+        if (pendingQuery !== null) {
+          // Enter antes de que lleguen los resultados: no enviar el
+          // formulario; buscar ya y elegir el primer resultado.
+          event.preventDefault();
+          selectFirstAfterSearch = true;
+          if (debounceTimer) {
+            clearTimeout(debounceTimer);
+            debounceTimer = null;
+            fetchJson(pendingQuery);
+          }
+          return;
+        }
         return;
       }
-      if (!options().length) return;
+      if (list.hidden || !options().length) return;
       if (event.key === "ArrowDown") {
         event.preventDefault();
         moveActive(1);
@@ -174,11 +246,19 @@
       }
     });
 
+    // Respaldo para navegadores que activan el submit en keypress.
+    input.addEventListener("keypress", function (event) {
+      if (event.key === "Enter" && (!list.hidden || pendingQuery !== null)) {
+        event.preventDefault();
+      }
+    });
+
     document.addEventListener("click", function (event) {
       if (!widget.contains(event.target)) closeList();
     });
 
     clearButton.addEventListener("click", function () {
+      cancelSearch();
       setSelected("", "");
       input.focus();
     });

@@ -14,7 +14,7 @@ from django.urls import reverse
 from employees.models import Department, Employee
 from inventory.forms import MovementForm
 from inventory.models import AdjustmentType, Movement, MovementType
-from inventory.selectors import recent_activity
+from inventory.selectors import product_label, recent_activity, search_products
 from inventory.services import register_movement
 from inventory.views import LOW_STOCK_DISPLAY_LIMIT
 from products.models import Category, Product, Unit
@@ -167,9 +167,9 @@ class MovementFormQuerySetTest(MovementFormTestBase):
         self.assertEqual(form.fields["project"].empty_label, "Sin proyecto")
 
     def test_product_option_label_shows_stock(self):
-        form = MovementForm()
-        product = form.fields["product"].queryset.get(pk=self.product.pk)
-        self.assertIn("stock: 100", form.product_option_label(product))
+        products = search_products(self.product.sku)
+        self.assertEqual(len(products), 1)
+        self.assertIn("stock: 100", product_label(products[0]))
 
     def test_selects_render_without_n_plus_one(self):
         form = MovementForm()

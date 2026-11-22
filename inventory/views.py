@@ -14,7 +14,12 @@ from projects.models import Project
 
 from .forms import MovementFilterForm, MovementForm
 from .models import Movement
-from .selectors import recent_activity
+from .selectors import (
+    product_for_autocomplete,
+    product_label,
+    recent_activity,
+    search_products,
+)
 from .services import register_movement
 
 
@@ -160,12 +165,24 @@ class MovementCreateView(StaffRequiredMixin, CreateView):
 
 
 def _product_payload(product):
-    """Fila JSON de un producto para el autocompletado del form."""
+    """Fila JSON de un producto para el autocompletado del form.
+
+    El stock se serializa sin ceros redundantes para que SQLite y
+    PostgreSQL produzcan la misma cadena (Decimal("100.00") y
+    Decimal("100") dan "100" en ambos motores).
+    """
     stock = getattr(product, "stock", None)
+    stock_str = None
+    if stock is not None:
+        # Solo se recortan ceros tras el punto decimal: "100.00" → "100",
+        # "100.50" → "100.5" y un entero como "100" queda igual.
+        stock_str = format(stock, "f")
+        if "." in stock_str:
+            stock_str = stock_str.rstrip("0").rstrip(".")
     return {
         "id": product.pk,
-        "label": MovementForm.product_option_label(product),
-        "stock": str(stock) if stock is not None else None,
+        "label": product_label(product),
+        "stock": stock_str,
     }
 
 
@@ -178,9 +195,13 @@ def buscar_productos(request):
     sesión caducada o usuario sin permisos responde 403 en JSON (es un
     fetch del navegador, no una navegación: redirigir al login no sirve).
 
+    La vista solo hace auth, parseo de `q`/`id` y la forma del JSON; la
+    consulta y la etiqueta viven en inventory/selectors.py.
+
     - `?q=<texto>`: productos activos cuyo SKU o nombre contiene el
       texto (mínimo PRODUCT_SEARCH_MIN_LENGTH caracteres, máximo
-      PRODUCT_SEARCH_LIMIT resultados).
+      PRODUCT_SEARCH_LIMIT resultados). search_products anota el stock
+      solo sobre los resultados, no sobre todos los coincidentes.
     - `?id=<pk>`: un único producto activo, para restaurar la etiqueta
       del campo prefijado (?producto=) o al re-renderizar con errores.
     """
@@ -189,9 +210,7 @@ def buscar_productos(request):
 
     product_id = request.GET.get("id")
     if product_id and product_id.isdigit():
-        product = (
-            Product.objects.active().with_stock().filter(pk=product_id).first()
-        )
+        product = product_for_autocomplete(int(product_id))
         results = [_product_payload(product)] if product else []
         return JsonResponse({"results": results})
 
@@ -199,13 +218,8 @@ def buscar_productos(request):
     if len(query) < PRODUCT_SEARCH_MIN_LENGTH:
         return JsonResponse({"results": []})
 
-    queryset = (
-        Product.objects.active()
-        .with_stock()
-        .filter(Q(sku__icontains=query) | Q(name__icontains=query))
-    )
     results = [
         _product_payload(product)
-        for product in queryset[:PRODUCT_SEARCH_LIMIT]
+        for product in search_products(query, PRODUCT_SEARCH_LIMIT)
     ]
     return JsonResponse({"results": results})

@@ -1,7 +1,10 @@
+from django.db.models import Q
+
 from employees.models import Employee
+from products.models import Product
 from projects.models import Project
 
-from .models import AdjustmentType, Movement, MovementType
+from .models import AdjustmentType, Movement, MovementType, stock_expression
 
 
 def recent_activity(limit=5):
@@ -72,3 +75,53 @@ def recent_activity(limit=5):
 
     events.sort(key=lambda event: event["created_at"], reverse=True)
     return events[:limit]
+
+
+def product_label(product):
+    """Etiqueta de cada opción del autocompletado de productos.
+
+    Formato: `SKU - nombre · stock`. La consume el endpoint de
+    autocompletado buscar_productos y exige que el queryset haya
+    anexado `.stock` (stock_expression anotada).
+    """
+    stock = getattr(product, "stock", None)
+    if stock is None:
+        return str(product)
+    return f"{product} · stock: {stock:g}"
+
+
+def search_products(query, limit=10):
+    """Productos activos cuyo SKU o nombre contiene `query`, con stock.
+
+    Dos consultas: la primera trae solo los `limit` pks que coinciden
+    (ordenados por sku, name), la segunda anota el stock únicamente
+    sobre esos pks. La agregación de movimientos queda acotada a las
+    filas que se van a mostrar, no a todos los coincidentes.
+    """
+    pks = list(
+        Product.objects.active()
+        .filter(Q(sku__icontains=query) | Q(name__icontains=query))
+        .order_by("sku", "name")
+        .values_list("pk", flat=True)[:limit]
+    )
+    if not pks:
+        return []
+    products = Product.objects.filter(pk__in=pks).annotate(
+        stock=stock_expression("movements__")
+    )
+    by_pk = {product.pk: product for product in products}
+    return [by_pk[pk] for pk in pks if pk in by_pk]
+
+
+def product_for_autocomplete(pk):
+    """Producto activo con stock anexado, por pk.
+
+    Sirve para restaurar la etiqueta del campo prefijado (?producto=)
+    o al re-renderizar el form con errores.
+    """
+    return (
+        Product.objects.active()
+        .filter(pk=pk)
+        .annotate(stock=stock_expression("movements__"))
+        .first()
+    )
