@@ -15,10 +15,14 @@ from projects.models import Project
 from .forms import MovementFilterForm, MovementForm
 from .models import Movement
 from .selectors import (
+    employee_for_autocomplete,
     product_for_autocomplete,
     product_label,
+    project_for_autocomplete,
     recent_activity,
+    search_employees,
     search_products,
+    search_projects,
 )
 from .services import register_movement
 
@@ -28,8 +32,8 @@ LOW_STOCK_DISPLAY_LIMIT = 6
 STAFF_REQUIRED_MESSAGE = (
     "Tu cuenta no tiene permisos para registrar movimientos."
 )
-PRODUCT_SEARCH_MIN_LENGTH = 2
-PRODUCT_SEARCH_LIMIT = 10
+AUTOCOMPLETE_MIN_LENGTH = 2
+AUTOCOMPLETE_LIMIT = 10
 
 
 class StaffRequiredMixin(LoginRequiredMixin):
@@ -187,20 +191,20 @@ def _product_payload(product):
 
 
 @require_GET
-def buscar_productos(request):
+def product_search(request):
     """Autocompletado en tiempo real del campo producto de /movimientos/nuevo/.
 
-    Primer (y único) endpoint JSON de la app: alimenta el buscador del
-    formulario, no es una API pública. Acceso exclusivo de staff; ante
-    sesión caducada o usuario sin permisos responde 403 en JSON (es un
-    fetch del navegador, no una navegación: redirigir al login no sirve).
+    Endpoint JSON de la app: alimenta el buscador del formulario, no es
+    una API pública. Acceso exclusivo de staff; ante sesión caducada o
+    usuario sin permisos responde 403 en JSON (es un fetch del navegador,
+    no una navegación: redirigir al login no sirve).
 
     La vista solo hace auth, parseo de `q`/`id` y la forma del JSON; la
     consulta y la etiqueta viven en inventory/selectors.py.
 
     - `?q=<texto>`: productos activos cuyo SKU o nombre contiene el
-      texto (mínimo PRODUCT_SEARCH_MIN_LENGTH caracteres, máximo
-      PRODUCT_SEARCH_LIMIT resultados). search_products anota el stock
+      texto (mínimo AUTOCOMPLETE_MIN_LENGTH caracteres, máximo
+      AUTOCOMPLETE_LIMIT resultados). search_products anota el stock
       solo sobre los resultados, no sobre todos los coincidentes.
     - `?id=<pk>`: un único producto activo, para restaurar la etiqueta
       del campo prefijado (?producto=) o al re-renderizar con errores.
@@ -215,11 +219,79 @@ def buscar_productos(request):
         return JsonResponse({"results": results})
 
     query = (request.GET.get("q") or "").strip()
-    if len(query) < PRODUCT_SEARCH_MIN_LENGTH:
+    if len(query) < AUTOCOMPLETE_MIN_LENGTH:
         return JsonResponse({"results": []})
 
     results = [
         _product_payload(product)
-        for product in search_products(query, PRODUCT_SEARCH_LIMIT)
+        for product in search_products(query, AUTOCOMPLETE_LIMIT)
+    ]
+    return JsonResponse({"results": results})
+
+
+def _employee_payload(employee):
+    """Fila JSON de un empleado para el autocompletado del form."""
+    return {"id": employee.pk, "label": str(employee)}
+
+
+@require_GET
+def employee_search(request):
+    """Autocompletado en tiempo real del campo empleado de /movimientos/nuevo/.
+
+    Mismo contrato que product_search: staff-only, `?q=` busca empleados
+    activos por nombre o apellido (mínimo AUTOCOMPLETE_MIN_LENGTH, tope
+    AUTOCOMPLETE_LIMIT) y `?id=` devuelve un empleado activo para
+    restaurar la etiqueta del campo.
+    """
+    if not request.user.is_staff:
+        return JsonResponse({"error": "No autorizado"}, status=403)
+
+    employee_id = request.GET.get("id")
+    if employee_id and employee_id.isdigit():
+        employee = employee_for_autocomplete(int(employee_id))
+        results = [_employee_payload(employee)] if employee else []
+        return JsonResponse({"results": results})
+
+    query = (request.GET.get("q") or "").strip()
+    if len(query) < AUTOCOMPLETE_MIN_LENGTH:
+        return JsonResponse({"results": []})
+
+    results = [
+        _employee_payload(employee)
+        for employee in search_employees(query, AUTOCOMPLETE_LIMIT)
+    ]
+    return JsonResponse({"results": results})
+
+
+def _project_payload(project):
+    """Fila JSON de un proyecto para el autocompletado del form."""
+    return {"id": project.pk, "label": str(project)}
+
+
+@require_GET
+def project_search(request):
+    """Autocompletado en tiempo real del campo proyecto de /movimientos/nuevo/.
+
+    Mismo contrato que product_search: staff-only, `?q=` busca proyectos
+    activos (CREATED/APPROVED) por código o nombre (mínimo
+    AUTOCOMPLETE_MIN_LENGTH, tope AUTOCOMPLETE_LIMIT) y `?id=` devuelve
+    un proyecto activo para restaurar la etiqueta del campo.
+    """
+    if not request.user.is_staff:
+        return JsonResponse({"error": "No autorizado"}, status=403)
+
+    project_id = request.GET.get("id")
+    if project_id and project_id.isdigit():
+        project = project_for_autocomplete(int(project_id))
+        results = [_project_payload(project)] if project else []
+        return JsonResponse({"results": results})
+
+    query = (request.GET.get("q") or "").strip()
+    if len(query) < AUTOCOMPLETE_MIN_LENGTH:
+        return JsonResponse({"results": []})
+
+    results = [
+        _project_payload(project)
+        for project in search_projects(query, AUTOCOMPLETE_LIMIT)
     ]
     return JsonResponse({"results": results})

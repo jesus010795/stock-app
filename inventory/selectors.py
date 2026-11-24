@@ -81,7 +81,7 @@ def product_label(product):
     """Etiqueta de cada opción del autocompletado de productos.
 
     Formato: `SKU - nombre · stock`. La consume el endpoint de
-    autocompletado buscar_productos y exige que el queryset haya
+    autocompletado product_search y exige que el queryset haya
     anexado `.stock` (stock_expression anotada).
     """
     stock = getattr(product, "stock", None)
@@ -125,3 +125,39 @@ def product_for_autocomplete(pk):
         .annotate(stock=stock_expression("movements__"))
         .first()
     )
+
+
+def search_employees(query, limit=10):
+    """Empleados activos cuyo nombre o apellido contiene `query`.
+
+    select_related("department") porque Employee.__str__ toca el nombre
+    del departamento: sin el join habría N+1 por opción.
+    """
+    return list(
+        Employee.objects.filter(is_active=True)
+        .filter(Q(first_name__icontains=query) | Q(last_name__icontains=query))
+        .select_related("department")[:limit]
+    )
+
+
+def employee_for_autocomplete(pk):
+    """Empleado activo por pk, para restaurar la etiqueta del campo."""
+    return (
+        Employee.objects.filter(is_active=True, pk=pk)
+        .select_related("department")
+        .first()
+    )
+
+
+def search_projects(query, limit=10):
+    """Proyectos activos (CREATED/APPROVED) cuyo código o nombre contiene `query`."""
+    return list(
+        Project.objects.active()
+        .filter(Q(code__icontains=query) | Q(name__icontains=query))
+        .order_by("code", "name")[:limit]
+    )
+
+
+def project_for_autocomplete(pk):
+    """Proyecto activo por pk, para restaurar la etiqueta del campo."""
+    return Project.objects.active().filter(pk=pk).first()

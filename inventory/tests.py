@@ -117,10 +117,12 @@ class MovementFormPresentationTest(MovementFormTestBase):
 
     def test_widgets_use_design_system_classes(self):
         form = MovementForm()
-        # El producto es un hidden input alimentado por el buscador con
-        # autocompletado (static/js/product-autocomplete.js); el input
-        # visible vive en la plantilla.
+        # Producto, empleado y proyecto son hidden inputs alimentados
+        # por el buscador con autocompletado (static/js/autocomplete.js);
+        # los inputs visibles viven en la plantilla.
         self.assertIn('<input type="hidden" name="product"', str(form["product"]))
+        self.assertIn('<input type="hidden" name="employee"', str(form["employee"]))
+        self.assertIn('<input type="hidden" name="project"', str(form["project"]))
         self.assertIn('class="select"', str(form["movement_type"]))
         self.assertIn('class="input"', str(form["quantity"]))
         self.assertIn('step="0.01"', str(form["quantity"]))
@@ -161,22 +163,17 @@ class MovementFormQuerySetTest(MovementFormTestBase):
         self.assertIn(self.project_created.pk, pks)
         self.assertNotIn(self.project_finished.pk, pks)
 
-    def test_optional_selects_have_spanish_empty_labels(self):
-        form = MovementForm()
-        self.assertEqual(form.fields["employee"].empty_label, "Seleccione un empleado…")
-        self.assertEqual(form.fields["project"].empty_label, "Sin proyecto")
-
-    def test_product_option_label_shows_stock(self):
+    def test_product_label_shows_stock(self):
         products = search_products(self.product.sku)
         self.assertEqual(len(products), 1)
         self.assertIn("stock: 100", product_label(products[0]))
 
-    def test_selects_render_without_n_plus_one(self):
+    def test_autocomplete_fields_render_without_queries(self):
         form = MovementForm()
-        # El producto es un hidden input (0 consultas: el buscador pide
-        # las opciones al endpoint JSON bajo demanda). Empleado y
-        # proyecto siguen siendo selects: 1 consulta cada uno.
-        with self.assertNumQueries(2):
+        # Producto, empleado y proyecto son hidden inputs (0 consultas:
+        # los buscadores piden las opciones a los endpoints JSON bajo
+        # demanda).
+        with self.assertNumQueries(0):
             str(form["product"])
             str(form["employee"])
             str(form["project"])
@@ -288,7 +285,7 @@ class MovementCreateViewTest(MovementFormTestBase):
             f'<input type="hidden" name="product" value="{self.product.pk}"',
         )
         self.assertContains(response, "data-autocomplete-input")
-        self.assertContains(response, reverse("inventory:buscar-productos"))
+        self.assertContains(response, reverse("inventory:product-search"))
 
     def test_invalid_product_query_param_does_not_break(self):
         response = self.client.get(self.url(), {"producto": "abc"})
@@ -428,7 +425,7 @@ class ProductSearchEndpointTest(MovementFormTestBase):
             username="search-normal", password="test1234"
         )
         # 12 productos que comparten la palabra "serie" para probar el
-        # tope de resultados (PRODUCT_SEARCH_LIMIT = 10).
+        # tope de resultados (AUTOCOMPLETE_LIMIT = 10).
         for i in range(1, 13):
             Product.objects.create(
                 sku=f"SER-{i:04d}",
@@ -444,7 +441,7 @@ class ProductSearchEndpointTest(MovementFormTestBase):
         else:
             self.client.force_login(user)
         return self.client.get(
-            reverse("inventory:buscar-productos"), params or {}
+            reverse("inventory:product-search"), params or {}
         )
 
     def test_staff_search_by_sku_and_by_name(self):
@@ -501,7 +498,206 @@ class ProductSearchEndpointTest(MovementFormTestBase):
     def test_post_is_rejected(self):
         self.client.force_login(self.staff)
         response = self.client.post(
-            reverse("inventory:buscar-productos"), {"q": "cable"}
+            reverse("inventory:product-search"), {"q": "cable"}
+        )
+        self.assertEqual(response.status_code, 405)
+
+
+class EmployeeSearchEndpointTest(MovementFormTestBase):
+    """Autocompletado del campo empleado: /movimientos/empleados/buscar/.
+
+    Mismo contrato HTTP que ProductSearchEndpointTest: staff-only,
+    mínimo 2 caracteres, tope AUTOCOMPLETE_LIMIT, `?id=` para restaurar
+    la etiqueta.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.staff = User.objects.create_user(
+            username="employee-search-staff", password="test1234", is_staff=True
+        )
+        cls.non_staff = User.objects.create_user(
+            username="employee-search-normal", password="test1234"
+        )
+        # 12 empleados que comparten la palabra "serie" para probar el
+        # tope de resultados (AUTOCOMPLETE_LIMIT = 10).
+        for i in range(1, 13):
+            Employee.objects.create(
+                first_name=f"Serie {i}",
+                last_name="Operario",
+                department=cls.department,
+                created_by=cls.staff,
+            )
+
+    def search(self, user=None, **params):
+        if user is None:
+            self.client.logout()
+        else:
+            self.client.force_login(user)
+        return self.client.get(
+            reverse("inventory:employee-search"), params or {}
+        )
+
+    def test_staff_search_by_first_and_last_name(self):
+        for query in ("Ana", "pérez"):
+            with self.subTest(query=query):
+                response = self.search(user=self.staff, q=query)
+                self.assertEqual(response.status_code, 200)
+                results = response.json()["results"]
+                self.assertEqual(len(results), 1)
+                self.assertEqual(results[0]["id"], self.employee.pk)
+                self.assertEqual(
+                    results[0]["label"], "Pérez, Ana (Mantenimiento)"
+                )
+
+    def test_search_excludes_inactive_employees(self):
+        response = self.search(user=self.staff, q="López")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"], [])
+
+    def test_query_below_min_length_returns_empty(self):
+        for query in ("", "a", "  a "):
+            with self.subTest(query=query):
+                response = self.search(user=self.staff, q=query)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["results"], [])
+
+    def test_results_are_capped_at_the_limit(self):
+        response = self.search(user=self.staff, q="serie")
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 10)
+        self.assertTrue(all("Operario" in r["label"] for r in results))
+
+    def test_id_lookup_returns_only_active_employees(self):
+        response = self.search(user=self.staff, id=self.employee.pk)
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual([r["id"] for r in results], [self.employee.pk])
+        self.assertEqual(results[0]["label"], "Pérez, Ana (Mantenimiento)")
+
+    def test_id_lookup_ignores_inactive_and_unknown(self):
+        for employee_id in (self.inactive_employee.pk, 99999, "abc"):
+            with self.subTest(employee_id=employee_id):
+                response = self.search(user=self.staff, id=employee_id)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["results"], [])
+
+    def test_requires_staff(self):
+        for user, expected in ((None, 403), (self.non_staff, 403)):
+            with self.subTest(user=user):
+                response = self.search(user=user, q="ana")
+                self.assertEqual(response.status_code, expected)
+                self.assertEqual(response.json()["error"], "No autorizado")
+
+    def test_post_is_rejected(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse("inventory:employee-search"), {"q": "ana"}
+        )
+        self.assertEqual(response.status_code, 405)
+
+
+class ProjectSearchEndpointTest(MovementFormTestBase):
+    """Autocompletado del campo proyecto: /movimientos/proyectos/buscar/.
+
+    Mismo contrato HTTP que ProductSearchEndpointTest: staff-only,
+    mínimo 2 caracteres, tope AUTOCOMPLETE_LIMIT, `?id=` para restaurar
+    la etiqueta. Solo proyectos activos (CREATED/APPROVED), el mismo
+    queryset que valida el form.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.staff = User.objects.create_user(
+            username="project-search-staff", password="test1234", is_staff=True
+        )
+        cls.non_staff = User.objects.create_user(
+            username="project-search-normal", password="test1234"
+        )
+        # 12 proyectos que comparten la palabra "serie" para probar el
+        # tope de resultados (AUTOCOMPLETE_LIMIT = 10).
+        for i in range(1, 13):
+            Project.objects.create(
+                code=f"SER-{i:04d}",
+                name=f"Proyecto serie {i}",
+                status=ProjectStatus.CREATED,
+            )
+
+    def search(self, user=None, **params):
+        if user is None:
+            self.client.logout()
+        else:
+            self.client.force_login(user)
+        return self.client.get(
+            reverse("inventory:project-search"), params or {}
+        )
+
+    def test_staff_search_by_code_and_by_name(self):
+        for query in ("PRJ-001", "proyecto aprobado"):
+            with self.subTest(query=query):
+                response = self.search(user=self.staff, q=query)
+                self.assertEqual(response.status_code, 200)
+                results = response.json()["results"]
+                self.assertEqual(len(results), 1)
+                self.assertEqual(results[0]["id"], self.project_approved.pk)
+                self.assertEqual(
+                    results[0]["label"], "PRJ-001 - Proyecto aprobado"
+                )
+
+    def test_search_includes_created_and_approved(self):
+        response = self.search(user=self.staff, q="PRJ-00")
+        self.assertEqual(response.status_code, 200)
+        pks = [r["id"] for r in response.json()["results"]]
+        self.assertIn(self.project_approved.pk, pks)
+        self.assertIn(self.project_created.pk, pks)
+
+    def test_search_excludes_finished_projects(self):
+        response = self.search(user=self.staff, q="PRJ-003")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"], [])
+
+    def test_query_below_min_length_returns_empty(self):
+        for query in ("", "p", "  p "):
+            with self.subTest(query=query):
+                response = self.search(user=self.staff, q=query)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["results"], [])
+
+    def test_results_are_capped_at_the_limit(self):
+        response = self.search(user=self.staff, q="serie")
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 10)
+        self.assertTrue(all("Proyecto serie" in r["label"] for r in results))
+
+    def test_id_lookup_returns_only_active_projects(self):
+        response = self.search(user=self.staff, id=self.project_approved.pk)
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual([r["id"] for r in results], [self.project_approved.pk])
+        self.assertEqual(results[0]["label"], "PRJ-001 - Proyecto aprobado")
+
+    def test_id_lookup_ignores_finished_and_unknown(self):
+        for project_id in (self.project_finished.pk, 99999, "abc"):
+            with self.subTest(project_id=project_id):
+                response = self.search(user=self.staff, id=project_id)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["results"], [])
+
+    def test_requires_staff(self):
+        for user, expected in ((None, 403), (self.non_staff, 403)):
+            with self.subTest(user=user):
+                response = self.search(user=user, q="prj")
+                self.assertEqual(response.status_code, expected)
+                self.assertEqual(response.json()["error"], "No autorizado")
+
+    def test_post_is_rejected(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse("inventory:project-search"), {"q": "prj"}
         )
         self.assertEqual(response.status_code, 405)
 

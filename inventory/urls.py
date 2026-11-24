@@ -8,8 +8,18 @@ urlpatterns = [
     path("nuevo/", views.MovementCreateView.as_view(), name="nuevo"),
     path(
         "productos/buscar/",
-        views.buscar_productos,
-        name="buscar-productos",
+        views.product_search,
+        name="product-search",
+    ),
+    path(
+        "empleados/buscar/",
+        views.employee_search,
+        name="employee-search",
+    ),
+    path(
+        "proyectos/buscar/",
+        views.project_search,
+        name="project-search",
     ),
     path("<int:pk>/", views.MovementDetailView.as_view(), name="detalle"),
 ]

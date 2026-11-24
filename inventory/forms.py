@@ -27,12 +27,15 @@ class MovementForm(forms.ModelForm):
             "reason": "Motivo",
         }
         widgets = {
-            # El producto no se elige de un desplegable: el campo queda
-            # oculto y la plantilla monta un buscador con autocompletado
-            # (templates/inventory/movimiento_form.html + static/js/
-            # product-autocomplete.js) contra el endpoint JSON
-            # inventory:buscar-productos. La validación del pk no cambia:
-            # ModelChoiceField sigue rechazando valores fuera del queryset.
+            # Producto, empleado y proyecto no se eligen de un
+            # desplegable: sus campos quedan ocultos y la plantilla
+            # monta un combobox con autocompletado para cada uno
+            # (templates/inventory/movimiento_form.html +
+            # templates/inventory/_autocomplete_field.html + static/js/
+            # autocomplete.js) contra los endpoints JSON de inventory
+            # (product-search, employee-search, project-search). La
+            # validación del pk no cambia: ModelChoiceField sigue
+            # rechazando valores fuera del queryset.
             "product": forms.HiddenInput(),
             "movement_type": forms.Select(attrs={"class": "select"}),
             "adjustment_type": forms.Select(attrs={"class": "select"}),
@@ -44,8 +47,8 @@ class MovementForm(forms.ModelForm):
                     "inputmode": "decimal",
                 }
             ),
-            "employee": forms.Select(attrs={"class": "select"}),
-            "project": forms.Select(attrs={"class": "select"}),
+            "employee": forms.HiddenInput(),
+            "project": forms.HiddenInput(),
             "reason": forms.Textarea(
                 attrs={
                     "class": "textarea",
@@ -87,12 +90,11 @@ class MovementForm(forms.ModelForm):
         # consume el endpoint de autocompletado. Sin with_stock(): el
         # ModelChoiceField con HiddenInput solo necesita validar el pk.
         self.fields["product"].queryset = Product.objects.active()
-        self.fields["employee"].queryset = Employee.objects.filter(
-            is_active=True
-        ).select_related("department")
-        self.fields["employee"].empty_label = "Seleccione un empleado…"
+        # El empleado también es un hidden: la validación solo necesita
+        # el pk, así que no hace falta select_related("department") (el
+        # join lo lleva el endpoint, que sí pinta la etiqueta).
+        self.fields["employee"].queryset = Employee.objects.filter(is_active=True)
         self.fields["project"].queryset = Project.objects.active()
-        self.fields["project"].empty_label = "Sin proyecto"
 
 
 class MovementFilterForm(forms.Form):

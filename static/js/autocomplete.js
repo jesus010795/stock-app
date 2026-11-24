@@ -1,18 +1,23 @@
 /* ===========================================================
-   AlmacenSys — product-autocomplete.js
-   Autocompletado en tiempo real del campo producto del formulario
-   de movimientos (/movimientos/nuevo/).
+   AlmacenSys — autocomplete.js
+   Autocompletado en tiempo real de los campos producto, empleado y
+   proyecto del formulario de movimientos (/movimientos/nuevo/).
 
-   Marcaje esperado (movimiento_form.html):
+   El script es genérico: inicializa cada widget marcado con
+   [data-autocomplete] y toda su configuración (endpoint, input visible
+   y campo oculto) viene de atributos data-*.
+
+   Marcaje esperado (templates/inventory/_autocomplete_field.html):
    <div class="autocomplete" data-autocomplete
-        data-autocomplete-url="{% url 'inventory:buscar-productos' %}">
+        data-autocomplete-url="{% url 'inventory:product-search' %}">
      <input ... data-autocomplete-input data-autocomplete-hidden="id_product">
      <button ... data-autocomplete-clear>
      <ul ... data-autocomplete-list>
    </div>
 
    El input visible NO es parte del form: el pk elegido se escribe en
-   el campo oculto `id_product` y el servidor valida como siempre.
+   el campo oculto `id_product` (o `id_employee` / `id_project`) y el
+   servidor valida como siempre.
    JS puro, sin dependencias.
 
    Teclado: con la lista abierta, Enter elige la opción resaltada (o la

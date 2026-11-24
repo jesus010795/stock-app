@@ -1,0 +1,32 @@
+{% comment %} Campo con búsqueda autocompletada (combobox) para el form de movimientos.
+   El campo real del form es el hidden que se renderiza con {{ field }};
+   el input visible es solo de búsqueda: el pk elegido se escribe en el
+   hidden y el servidor valida como siempre (static/js/autocomplete.js).  {% endcomment %}
+<div class="form-group">
+    <label for="{{ input_id }}">{{ field.label }}</label>
+    {{ field }}
+    <div class="autocomplete" data-autocomplete
+         data-autocomplete-url="{{ autocomplete_url }}">
+        <div class="autocomplete-input-wrap">
+            <input type="text" id="{{ input_id }}" class="input"
+                   autocomplete="off"
+                   placeholder="{{ placeholder }}"
+                   role="combobox" aria-expanded="false"
+                   aria-autocomplete="list"
+                   data-autocomplete-input
+                   data-autocomplete-hidden="{{ field.auto_id }}">
+            <button type="button" class="autocomplete-clear"
+                    data-autocomplete-clear
+                    aria-label="Quitar la opción seleccionada" hidden>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="autocomplete-list" data-autocomplete-list hidden></ul>
+    </div>
+    {% if field.errors %}
+    <div class="field-error">{{ field.errors }}</div>
+    {% endif %}
+    {% if field.help_text %}
+    <small class="field-help">{{ field.help_text }}</small>
+    {% endif %}
+</div>
